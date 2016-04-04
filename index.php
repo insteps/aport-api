@@ -21,7 +21,7 @@ $url = new Url();
 // -------------------------------
 $config['version'] = '0.0.1';
 // Setting a full domain as base URI
-$url->setBaseUri('http://localhost/pt');
+$url->setBaseUri('http://localhost/aport-api');
 
 $config['apiurl'] = $url->getBaseUri();
 
@@ -33,11 +33,14 @@ $config['mysql'] = array(
     "dbname" =>   "aports"
 );
 $config['mysql']["persistent"] = false;
+
 // for sqlite
 $config['sqlite'] = array(
     "dbname" => "db/aports.db"
 );
 $config['dbtype'] = 'sqlite';
+
+$config['app']['pglimit'] = 50; #default items per page
 // -------------------------------
 
 // Use Loader() to autoload our model
@@ -67,7 +70,7 @@ if( $config['dbtype'] === 'mysql' ) {
 $app = new \Phalcon\Mvc\Micro($di);
 $app->config = $config;
 $app->myapi = new stdClass;
-$app->myapi->pglimit = 50; #default items per page
+$app->myapi->pglimit = $config['app']['pglimit'];
 $app->myapi->_reqUrl = $app->request->get('_url'); #set default _reqUrl
 
 $app->get('/', function () {
