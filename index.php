@@ -109,9 +109,9 @@ The API consists of the following methods: # TODO - clean text import from lua
   --static ----------------
   GET     | favicon.ico                            | web.StaticFileHandler, "assets/favicon.ico"
   --others ----------------
-  DELETE  | /api/robots/2                          | Deletes robots based on primary key
-  POST    | favicon.ico                            | POST
-  PUT     | favicon.ico                            | web.StaticFileHandler, "assets/favicon.ico"
+  DELETE  | /api/test/100                          | 
+  POST    | /api/add/10                            | 
+  PUT     | /api/add/10                            | 
 
 */
 
@@ -181,7 +181,7 @@ $app->get('/packages/page', function () use ($app) {
 // Retrieves packages by paginations
 $app->get('/packages/page/{page:[0-9]+}', function ($page) use ($app) {
     $page = (int)$page;
-    $app->myapi->offset = (int)$page * $app->myapi->pglimit + 1;
+    $app->myapi->offset = $page * $app->myapi->pglimit + 1;
     $app->myapi->pgNext = $page + 1;
     $app->myapi->pgPrev = $app->myapi->offset - 1;
     $app->handle("/packages");
@@ -195,7 +195,6 @@ $app->get('/packages/{id:[0-9]+}', function ($id) use ($app) {
     $data->data = fmtData($res, 'packages.id', $app)->data;
     $data = populate_maintainer($data, $app);
     if($data) json_api_encode($data, $app);
-
 });
 
 // Retrieves packages by relationships
@@ -227,11 +226,6 @@ $app->get('/packages/{id:[0-9]+}/relationships/{type}', function ($id, $type) us
 
 });
 
-
-$app->get('/install_if', function () use ($app) {
-    $app->handle('/404');
-});
-
 $app->get('/install_if/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     $data = initJapiData($app, 'install_if');
     # meta
@@ -249,10 +243,6 @@ $app->get('/install_if/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     return json_api_encode($data, $app);
 });
 
-$app->get('/provides', function () use ($app) {
-    $app->handle('/404');
-});
-
 $app->get('/provides/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     $data = initJapiData($app, 'provides');
     # meta
@@ -268,10 +258,6 @@ $app->get('/provides/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     $data->meta['pkg-count'] = $tnum2;
     $data->data = fmtData($res, 'provides.pid', $app)->data;
     return json_api_encode($data, $app);
-});
-
-$app->get('/depends', function () use ($app) {
-    $app->handle('/404');
 });
 
 $app->get('/depends/pid/{pid:[0-9]+}', function ($pid) use ($app) {
@@ -322,10 +308,6 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function ($name, $typ
 
         //return $app->handle("/packages/$pid"); # TODO
     }
-    $app->handle('/404');
-});
-
-$app->get('/contents', function () use ($app) {
     $app->handle('/404');
 });
 
