@@ -131,7 +131,8 @@ $app->get('/packages', function () use ($app) {
     $tnum = count($res);
     $tpgs = round($tnum/$limit);
     $mod = $tnum%$limit;
-    if($mod >= 0) $tpgs = $tpgs+1;
+    // if($mod >= 0) $tpgs = $tpgs+1;
+    if($mod >= 0) $tpgs = $tpgs; # TODO
 
     $offset = isset($app->myapi->offset) ? $app->myapi->offset : 0;
 
@@ -184,6 +185,13 @@ $app->get('/packages/page', function () use ($app) {
 // Retrieves packages by paginations
 $app->get('/packages/page/{page:[0-9]+}', function ($page) use ($app) {
     $page = (int)$page;
+
+    $limit = $app->myapi->pglimit;
+    $res = Packages::find();
+    $tnum = count($res);
+    $tpgs = round($tnum/$limit);
+    if($page > $tpgs) return $app->handle('/404');
+
     $app->myapi->offset = $page * $app->myapi->pglimit + 1;
     $app->myapi->pgNext = $page + 1;
     $app->myapi->pgPrev = $app->myapi->offset - 1;
@@ -290,7 +298,7 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function ($name, $typ
         $res = $app->modelsManager->executeQuery($phql);
         $tnum = count($res);
         $data->meta = array(
-            'pkg-count' => $tnum
+            'files' => $tnum
         );
 
         $data->data = fmtData($res, 'packages.', $app)->data;
