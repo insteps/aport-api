@@ -2,3 +2,5 @@
 
 * refactor
 * cleanups
+* some caching of objects to improve performances
+

@@ -614,6 +614,7 @@ function json_api_encode($data, $app, $flags=array()) {
     $header['japi'] = 'application/vnd.api+json';
     //$response = new Phalcon\Http\Response();
 
+    //enable in production
     //$app->response->setContentType($header['japi'])->sendHeaders();
     echo json_encode($data);
 }
