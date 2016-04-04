@@ -188,10 +188,15 @@ $app->get('/packages/page/{page:[0-9]+}', function ($page) use ($app) {
 });
 
 // Retrieves packages by id
-$app->get('/packages/{id:[0-9]+}', function ($id) use ($app) {
+$app->get('/packages/{pid:[0-9]+}', function ($pid) use ($app) {
+    return $app->handle("/packages/pid/$pid");
+});
+
+// Retrieves packages by id
+$app->get('/packages/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     $data = initJapiData($app, 'packages');
 
-    $res = Packages::find( array( "id = '$id'", 'limit' => 1) );
+    $res = Packages::find( array( "id = '$pid'", 'limit' => 1) );
     $data->data = fmtData($res, 'packages.id', $app)->data;
     $data = populate_maintainer($data, $app);
     if($data) json_api_encode($data, $app);
@@ -200,30 +205,15 @@ $app->get('/packages/{id:[0-9]+}', function ($id) use ($app) {
 // Retrieves packages by relationships
 $app->get('/packages/{id:[0-9]+}/relationships/{type}', function ($id, $type) use ($app) {
 
-    $rels = array ("origins", "depends", "provides", "install_if", "contents");
-
-    if($type === 'origins') {
-        return $app->handle("/packages/$id");
-    }
-
-    if($type === 'depends') {
-        return $app->handle("/depends/pid/$id");
-    }
-
-    if($type === 'provides') {
-        return $app->handle("/provides/pid/$id");
-    }
-
-    if($type === 'install_if') {
-        return $app->handle("/install_if/pid/$id");
-    }
-
-    if($type === 'contents') {
-        return $app->handle("/contents/pid/$id");
-    }
+    $rels = array("origins", "depends", "provides", "install_if", "contents");
+    return $app->handle("/$type/pid/$id");
 
     $app->handle('/404');
 
+});
+
+$app->get('/origins/pid/{pid:[0-9]+}', function ($pid) use ($app) {
+    return $app->handle("/packages/pid/$pid");
 });
 
 $app->get('/install_if/pid/{pid:[0-9]+}', function ($pid) use ($app) {
