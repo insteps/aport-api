@@ -74,7 +74,7 @@ $app->myapi->pglimit = $config['app']['pglimit'];
 $app->myapi->_reqUrl = $app->request->get('_url'); #set default _reqUrl
 
 $app->get('/', function () {
-    echo "<h1>Welcome !! </h1>The Json API for Alpine Linux.";
+    echo "<h1>Welcome !! </h1>The Json API for Alpine Linux aports.";
 });
 
 $app->get('/about', function () use ($config) {
@@ -105,6 +105,7 @@ The API consists of the following methods: # TODO - clean text import from lua
   GET     | /packages/(.*)/relationships/(.*)$     | ApiPackagesRelationship, {aports=aports,model=model}
   GET     | /packages/(.*)$                        | ApiPackageRenderer {aports=aports,model=model}
   GET     | /packages                              | ApiPackagesRenderer {aports=aports,model=model}
+  GET     | /packages/page/<num>                   | Paginated object for packages
   --contents --------------
   GET     | /contents/(.*)/relationships/packages$ | ApiRelationshipsPackagesRenderer, {aports=aports,model=model}
   GET     | /contents/(.*)$                        | ApiContentRenderer {aports=aports,model=model}
@@ -129,10 +130,9 @@ $app->get('/packages', function () use ($app) {
     $limit = $app->myapi->pglimit; $first = "1"; $next = "2";
     $res = Packages::find();
     $tnum = count($res);
-    $tpgs = round($tnum/$limit);
+    $tpgs = floor($tnum/$limit);
     $mod = $tnum%$limit;
-    // if($mod >= 0) $tpgs = $tpgs+1;
-    if($mod >= 0) $tpgs = $tpgs; # TODO
+    if($mod > 0) $tpgs = $tpgs+1;
 
     $offset = isset($app->myapi->offset) ? $app->myapi->offset : 0;
 
@@ -189,12 +189,15 @@ $app->get('/packages/page/{page:[0-9]+}', function ($page) use ($app) {
     $limit = $app->myapi->pglimit;
     $res = Packages::find();
     $tnum = count($res);
-    $tpgs = round($tnum/$limit);
+    $tpgs = floor($tnum/$limit);
+    $mod = $tnum%$limit;
+    if($mod > 0) $tpgs = $tpgs+1;
     if($page > $tpgs) return $app->handle('/404');
 
-    $app->myapi->offset = $page * $app->myapi->pglimit + 1;
-    $app->myapi->pgNext = $page + 1;
-    $app->myapi->pgPrev = $app->myapi->offset - 1;
+    $multiplier = ($page <= 1) ? 0 : $page-1;
+    $app->myapi->offset = $multiplier * $app->myapi->pglimit;
+    $app->myapi->pgNext = ($page+1 > $tpgs) ? $page : $page+1;
+    $app->myapi->pgPrev = ($page-1 <= 0) ? 1 : $page-1;
     $app->handle("/packages");
 });
 
