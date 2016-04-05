@@ -127,7 +127,8 @@ $app->get('/packages', function () use ($app) {
     $data = initJapiData($app, 'packages');
 
     # get Packages count and figure out paginations
-    $limit = $app->myapi->pglimit; $first = "1"; $next = "2";
+    $first = "1"; $next = "2";
+    $limit = $app->myapi->pglimit;
     $res = Packages::find();
     $tnum = count($res);
     $tpgs = floor($tnum/$limit);
@@ -206,16 +207,6 @@ $app->get('/packages/{pid:[0-9]+}', function ($pid) use ($app) {
     return $app->handle("/packages/pid/$pid");
 });
 
-// Retrieves packages by id
-$app->get('/packages/pid/{pid:[0-9]+}', function ($pid) use ($app) {
-    $data = initJapiData($app, 'packages');
-
-    $res = Packages::find( array( "id = '$pid'", 'limit' => 1) );
-    $data->data = fmtData($res, 'packages.id', $app)->data;
-    $data = populate_maintainer($data, $app);
-    if($data) json_api_encode($data, $app);
-});
-
 // Retrieves packages by relationships
 $app->get('/packages/{id:[0-9]+}/relationships/{type}', function ($id, $type) use ($app) {
 
@@ -224,6 +215,16 @@ $app->get('/packages/{id:[0-9]+}/relationships/{type}', function ($id, $type) us
 
     $app->handle('/404');
 
+});
+
+// Retrieves packages by id
+$app->get('/packages/pid/{pid:[0-9]+}', function ($pid) use ($app) {
+    $data = initJapiData($app, 'packages');
+
+    $res = Packages::find( array( "id = '$pid'", 'limit' => 1) );
+    $data->data = fmtData($res, 'packages.id', $app)->data;
+    $data = populate_maintainer($data, $app);
+    if($data) json_api_encode($data, $app);
 });
 
 $app->get('/origins/pid/{pid:[0-9]+}', function ($pid) use ($app) {
