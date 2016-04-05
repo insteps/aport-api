@@ -579,11 +579,8 @@ function fmtData($res, $type, $app) {
              "version", "installed_size", "branch", "size", "commit",
              "origin", "url", "repo", "name", "description"
         );
+        $relationships = array("depends", "provides", "install_if", "origins", "contents");
 
-        //$_reqUrl = $app->request->get('_url');
-        //$_reqUrl = $app->myapi->_reqUrl;
-        //$reqUrl = preg_replace('#\/relationships\/.*$#', '', $_reqUrl);
-        //$slink = $app->config['apiurl'].$reqUrl;
         $slink = '/' . $type . '/';
 
         foreach ($res as $item) {
@@ -596,14 +593,13 @@ function fmtData($res, $type, $app) {
                 $newitem[$l] = $item->$l;
             }
             $obj->attributes = (object)$newitem;
+            # process subtype
             if( $subtype === 'id' ) {
-                //$obj->links->self = $reqUrl; # to delete
-                //$jsonApi->data = $obj; # initially used for single data
-                $jsonApi->data[] = $obj; # see http://jsonapi.org/format/ if still an issue
             } else {
-                //$obj->links->self = $slink.$obj->id; # to delete
-                $jsonApi->data[] = $obj; # for many packages objects
             }
+            # see http://jsonapi.org/format/ if still an issue
+            //$jsonApi->data = $obj; # initially used for single data
+            $jsonApi->data[] = $obj; # for many packages objects
             $obj->links->self = $slink.$item->id;
             $rlink = $slink.$item->id .'/relationships/';
 
@@ -611,12 +607,10 @@ function fmtData($res, $type, $app) {
             $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
             $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
 
-            # relationships objects
-            $rels['origins']['links']['self'] = $rlink.'origins';
-            $rels['depends']['links']['self'] = $rlink.'depends';
-            $rels['install_if']['links']['self'] = $rlink.'install_if';
-            $rels['provides']['links']['self'] = $rlink.'provides';
-            $rels['contents']['links']['self'] = $rlink.'contents';
+            # make relationships objects links
+            foreach($relationships as $val) {
+                $rels[$val]['links']['self'] = $rlink.$val;
+            }
             $obj->relationships = (object)$rels;
         }
         return $jsonApi;
