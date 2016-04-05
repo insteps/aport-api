@@ -439,82 +439,35 @@ function fmtData($res, $type, $app) {
     $jsonApi = (object)array();
 
     if($type === 'install_if') {
-        $list = array( # hard code list just to remove pid field # TODO
-             "name", "version", "operator"
-        );
+        $dindentifier = 'pid';
+        $list = array( "name", "version", "operator" );  # hard code list just to remove pid field # TODO
+        $relationships = array("packages");
         $slink = '/' . $type . '/'; # TODO
-
-        foreach ($res as $item) {
-            $obj = (object)array();
-            $obj->pid = $item->pid;
-            $obj->type = $type;
-            $obj->links = new stdClass;
-
-            foreach($list as $l) {
-                $newitem[$l] = $item->$l;
-            }
-            $obj->attributes = (object)$newitem;
-            $jsonApi->data[] = $obj;
-            # using pid would make url name, either add id columns to table
-            #  or deal with weird file names
-            $obj->links->self = $slink.$item->name;
-            $rlink = $slink.$item->name .'/relationships/';
-
-            // some cleaning
-            $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
-            $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
-
-            # relationships objects
-            $rels['packages']['links']['self'] = $rlink.'packages';
-            $obj->relationships = (object)$rels;
-        }
-        return $jsonApi;
     }
 
     if($type === 'provides') {
-        $list = array( # hard code list just to remove pid field # TODO
-             "name", "version", "operator"
-        );
+        $dindentifier = 'pid';
+        $list = array( "name", "version", "operator" );
+        $relationships = array("packages");
         $slink = '/' . $type . '/';
         //$slink = '/' . 'files' . '/'; # TODO
-
-        foreach ($res as $item) {
-            $obj = (object)array();
-            $obj->pid = $item->pid;
-            $obj->type = $type;
-            $obj->links = new stdClass;
-
-            foreach($list as $l) {
-                $newitem[$l] = $item->$l;
-            }
-            $obj->attributes = (object)$newitem;
-            $jsonApi->data[] = $obj;
-            # using pid would make url name, either add id columns to table
-            #  or deal with weird file names
-            $obj->links->self = $slink.$item->name;
-            $rlink = $slink.$item->name .'/relationships/';
-
-            // some cleaning
-            $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
-            $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
-
-            # relationships objects
-            $rels['packages']['links']['self'] = $rlink.'packages';
-            $obj->relationships = (object)$rels;
-        }
-        return $jsonApi;
     }
 
     if($type === 'depends') {
-        $list = array( # hard code list just to remove pid field # TODO
-             "name", "version", "operator"
-        );
+        $dindentifier = 'pid';
+        $list = array( "name", "version", "operator" );
+        $relationships = array("packages");
         $slink = '/' . $type . '/';
         //$slink = '/' . 'files' . '/'; # TODO
+    }
 
+    if($type === 'install_if' || $type === 'provides' 
+       || $type === 'depends'
+      )
+      {
         foreach ($res as $item) {
             $obj = (object)array();
-            $obj->pid = $item->pid;
+            $obj->id = $item->$dindentifier;
             $obj->type = $type;
             $obj->links = new stdClass;
 
@@ -532,22 +485,24 @@ function fmtData($res, $type, $app) {
             $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
             $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
 
-            # relationships objects
-            $rels['packages']['links']['self'] = $rlink.'packages';
+            # make relationships objects links
+            foreach($relationships as $val) {
+                $rels[$val]['links']['self'] = $rlink.$val;
+            }
             $obj->relationships = (object)$rels;
         }
         return $jsonApi;
     }
 
-    if($type === 'contents') {
-        $list = array( # hard code list just to remove pid field # TODO
-             "file", "path"
-        );
+    if($type === 'contents') { # from table 'files'
+        $dindentifier = 'id';
+        $list = array( "file", "path" ); # hard code list just to remove pid field # TODO
+        $relationships = array("packages");
         $slink = '/' . $type . '/';
 
         foreach ($res as $item) {
             $obj = (object)array();
-            $obj->id = $item->id;
+            $obj->id = $item->$dindentifier;
             $obj->type = $type;
             $obj->links = new stdClass;
 
@@ -566,26 +521,28 @@ function fmtData($res, $type, $app) {
             $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
             $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
 
-            # relationships objects
-            $rels['packages']['links']['self'] = $rlink.'packages';
+            # make relationships objects links
+            foreach($relationships as $val) {
+                $rels[$val]['links']['self'] = $rlink.$val;
+            }
             $obj->relationships = (object)$rels;
         }
         return $jsonApi;
     }
 
     if($type === 'packages') {
+        $dindentifier = 'id';
         $list = array( # hard code list just to remove id field # TODO
              "license", "arch", "build_time", "maintainer", "checksum",
              "version", "installed_size", "branch", "size", "commit",
              "origin", "url", "repo", "name", "description"
         );
         $relationships = array("depends", "provides", "install_if", "origins", "contents");
-
         $slink = '/' . $type . '/';
 
         foreach ($res as $item) {
             $obj = (object)array();
-            $obj->id = $item->id;
+            $obj->id = $item->$dindentifier;
             $obj->type = $type;
             $obj->links = new stdClass;
 
