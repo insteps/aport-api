@@ -73,6 +73,21 @@ $app->myapi = new stdClass;
 $app->myapi->pglimit = $config['app']['pglimit'];
 $app->myapi->_reqUrl = $app->request->get('_url'); #set default _reqUrl
 
+// Define routes here
+// ====================
+
+/*
+
+The Site related API consists of the following methods:
+  Method  | URL                                    | Action
+  ------------------------------------------------------------------------------------------------
+  GET     | /$                                     | Welcome message
+  GET     | /about$                                | About sites api service
+  GET     | /docs$                                 | Documents welcome page
+  GET     | /docs/(.*)$                            | Documents subpages
+
+*/
+
 $app->get('/', function () {
     echo "<h1>Welcome !! </h1>The Json API for Alpine Linux aports.";
 });
@@ -96,7 +111,7 @@ $app->get('/docs', function () {
 
 /*
 
-The API consists of the following methods: # TODO - clean text import from lua
+The Aports API consists of the following methods: # TODO - clean text import from lua
 
   Method  | URL                                    | Action
   ------------------------------------------------------------------------------------------------
@@ -118,8 +133,6 @@ The API consists of the following methods: # TODO - clean text import from lua
   PUT     | /api/add/10                            | 
 
 */
-
-// Define routes here
 
 // Retrieves packages
 $app->get('/packages', function () use ($app) {
@@ -554,9 +567,9 @@ function fmtData($res, $type, $app) {
             if( $subtype === 'id' ) {
             } else {
             }
-            # see http://jsonapi.org/format/ if still an issue
-            //$jsonApi->data = $obj; # initially used for single data
-            $jsonApi->data[] = $obj; # for many packages objects
+            # see http://jsonapi.org/format/#document-top-level if still an issue
+            //$jsonApi->data = $obj; # primary data in a single resource identifier object
+            $jsonApi->data[] = $obj; # for more than one object (array)
             $obj->links->self = $slink.$item->id;
             $rlink = $slink.$item->id .'/relationships/';
 
