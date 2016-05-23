@@ -329,7 +329,7 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function ($name, $typ
     $app->handle('/404');
 });
 
-// Retrieves contents by id
+// Retrieves contents(files) by id
 $app->get('/contents/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     $data = initJapiData($app, 'contents');
     # meta
@@ -347,7 +347,7 @@ $app->get('/contents/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     return json_api_encode($data, $app);
 });
 
-// Retrieves contents by id
+// Retrieves contents(files) by id
 $app->get('/contents/id/{id:[0-9]+}', function ($id) use ($app) {
     $data = initJapiData($app, 'contents');
     $res = Files::find( array( "id = '$id'", 'limit' => 1) );
@@ -356,7 +356,7 @@ $app->get('/contents/id/{id:[0-9]+}', function ($id) use ($app) {
     return json_api_encode($data, $app);
 });
 
-// Retrieves package data by its content(id) relationships
+// Retrieves package data by its content(files->id) relationships
 $app->get('/contents/{id:[0-9]+}/relationships/{type}', function ($id, $type) use ($app) {
     if($type === 'packages') {
         $res = Files::find( array( "id = '$id'", 'limit' => 1) );
@@ -471,48 +471,31 @@ function fmtData($res, $type, $app) {
         $list = array( "name", "version", "operator" );
         $relationships = array("packages");
         $slink = '/' . $type . '/';
-        //$slink = '/' . 'files' . '/'; # TODO
-    }
-
-    if($type === 'install_if' || $type === 'provides' 
-       || $type === 'depends'
-      )
-      {
-        foreach ($res as $item) {
-            $obj = (object)array();
-            $obj->id = $item->$dindentifier;
-            $obj->type = $type;
-            $obj->links = new stdClass;
-
-            foreach($list as $l) {
-                $newitem[$l] = $item->$l;
-            }
-            $obj->attributes = (object)$newitem;
-            $jsonApi->data[] = $obj;
-            # using pid would make url name, either add id columns to table
-            #  or deal with weird file names
-            $obj->links->self = $slink.$item->name;
-            $rlink = $slink.$item->name .'/relationships/';
-
-            // some cleaning
-            $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
-            $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
-
-            # make relationships objects links
-            foreach($relationships as $val) {
-                $rels[$val]['links']['self'] = $rlink.$val;
-            }
-            $obj->relationships = (object)$rels;
-        }
-        return $jsonApi;
     }
 
     if($type === 'contents') { # from table 'files'
         $dindentifier = 'id';
-        $list = array( "file", "path" ); # hard code list just to remove pid field # TODO
+        $list = array( "file", "path" );
         $relationships = array("packages");
         $slink = '/' . $type . '/';
+    }
 
+    if($type === 'packages') {
+        $dindentifier = 'id';
+        $list = array( # hard code list just to remove id field # TODO
+             "license", "arch", "build_time", "maintainer", "checksum",
+             "version", "installed_size", "branch", "size", "commit",
+             "origin", "url", "repo", "name", "description"
+        );
+        $relationships = array("depends", "provides", "install_if", "origins", "contents");
+        $slink = '/' . $type . '/';
+    }
+
+    if($type === 'install_if'  || $type === 'provides' 
+       || $type === 'depends'  || $type === 'contents'
+       || $type === 'packages'
+      )
+      {
         foreach ($res as $item) {
             $obj = (object)array();
             $obj->id = $item->$dindentifier;
@@ -526,53 +509,22 @@ function fmtData($res, $type, $app) {
             if( $subtype === 'pid' ) {
             } else {
             }
-            $jsonApi->data[] = $obj;
-            $obj->links->self = $slink.$item->id;
-            $rlink = $slink.$item->id .'/relationships/';
 
-            // some cleaning
-            $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
-            $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
-
-            # make relationships objects links
-            foreach($relationships as $val) {
-                $rels[$val]['links']['self'] = $rlink.$val;
-            }
-            $obj->relationships = (object)$rels;
-        }
-        return $jsonApi;
-    }
-
-    if($type === 'packages') {
-        $dindentifier = 'id';
-        $list = array( # hard code list just to remove id field # TODO
-             "license", "arch", "build_time", "maintainer", "checksum",
-             "version", "installed_size", "branch", "size", "commit",
-             "origin", "url", "repo", "name", "description"
-        );
-        $relationships = array("depends", "provides", "install_if", "origins", "contents");
-        $slink = '/' . $type . '/';
-
-        foreach ($res as $item) {
-            $obj = (object)array();
-            $obj->id = $item->$dindentifier;
-            $obj->type = $type;
-            $obj->links = new stdClass;
-
-            foreach($list as $l) {
-                $newitem[$l] = $item->$l;
-            }
-            $obj->attributes = (object)$newitem;
-            # process subtype
-            if( $subtype === 'id' ) {
-            } else {
-            }
             # see http://jsonapi.org/format/#document-top-level if still an issue
             //$jsonApi->data = $obj; # primary data in a single resource identifier object
             $jsonApi->data[] = $obj; # for more than one object (array)
-            $obj->links->self = $slink.$item->id;
-            $rlink = $slink.$item->id .'/relationships/';
 
+            # using pid would add name in url, either add id columns to tables
+            #  or deal with weird file names
+
+            if($type == 'contents' || $type === 'packages') {
+                $obj->links->self = $slink.$item->id;
+                $rlink = $slink.$item->id .'/relationships/';
+
+            } else {
+                $obj->links->self = $slink.$item->name;
+                $rlink = $slink.$item->name .'/relationships/';
+            }
             // some cleaning
             $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
             $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
