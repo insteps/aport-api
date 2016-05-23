@@ -21,13 +21,13 @@ $url = new Url();
 // -------------------------------
 $config['version'] = '0.0.1';
 // Setting a full domain as base URI
-$url->setBaseUri('http://192.168.1.151/aport-api/?_url=');
+$url->setBaseUri('http://localhost/aport-api');
 
 $config['apiurl'] = $url->getBaseUri();
 
 // for mysql
 $config['mysql'] = array(
-    "host" =>     "192.168.1.151",
+    "host" =>     "localhost",
     "username" => "root",
     "password" => "",
     "dbname" =>   "aports"
