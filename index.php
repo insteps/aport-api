@@ -89,7 +89,7 @@ The Site related API consists of the following methods:
 */
 
 $app->get('/', function () {
-    echo "<h1>Welcome !! </h1>The Json API for Alpine Linux aports.";
+    echo "<h1>Welcome !! </h1>The Json API for Alpine Linux aports.\n";
 });
 
 $app->get('/about', function () use ($config) {
@@ -550,5 +550,5 @@ function json_api_encode($data, $app, $flags=array()) {
     echo json_encode($data);
 }
 
-
+header_remove('X-Powered-By');
 $app->handle();
