@@ -215,11 +215,12 @@ $app->get('/packages/page/{page:[0-9]+}', function ($page) use ($app) {
     $app->handle("/packages");
 });
 
-$app->get('/packages/name/{name:[a-z]{1}[a-z0-9\-\_\.]+}', function ($name) use ($app) {
+$app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function ($name) use ($app) {
     $data = initJapiData($app, 'packages');
 
     $res = Packages::find( array( "name = '$name'", "order" => "id DESC") );
     $tnum = count($res);
+    if($tnum < 1) { $app->handle('/404'); return; }
     $data->meta = array(
         'count' => $tnum
     );
@@ -230,11 +231,12 @@ $app->get('/packages/name/{name:[a-z]{1}[a-z0-9\-\_\.]+}', function ($name) use 
 });
 
 // Retrieves packages by name
-$app->get('/packages/{name:[a-z]{1}[a-z0-9\-\_\.]+}', function ($name) use ($app) {
+$app->get('/packages/{name:[a-z0-9\-\_\.]+}', function ($name) use ($app) {
     return $app->handle("/packages/name/$name");
 });
 
 // Retrieves packages by id
+// would override /packages/{name} if name is all digits
 $app->get('/packages/{pid:[0-9]+}', function ($pid) use ($app) {
     return $app->handle("/packages/pid/$pid");
 });
