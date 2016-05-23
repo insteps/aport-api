@@ -251,7 +251,7 @@ $app->get('/{rel:install_if|provides|depends|contents}/pid/{pid:[0-9]+}', functi
     $rels['contents'] = array("contents", 'Files', 'contents.pid');
     $_r = $rels[$rel];
 
-    $data = initJapiData($app, $rels[$rel][0]);
+    $data = initJapiData($app, $_r[0]);
     # meta
     $res = $_r[1]::find();
     $tnum = count($res);
