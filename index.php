@@ -21,13 +21,13 @@ $url = new Url();
 // -------------------------------
 $config['version'] = '0.0.1';
 // Setting a full domain as base URI
-$url->setBaseUri('http://localhost/aport-api');
+$url->setBaseUri('http://192.168.1.151/aport-api/?_url=');
 
 $config['apiurl'] = $url->getBaseUri();
 
 // for mysql
 $config['mysql'] = array(
-    "host" =>     "localhost",
+    "host" =>     "192.168.1.151",
     "username" => "root",
     "password" => "",
     "dbname" =>   "aports"
@@ -295,40 +295,6 @@ $app->get('/depends/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     return json_api_encode($data, $app);
 });
 
-// Retrieves package data by its depends(name) relationships (funny relationships)
-//  possibly taken as packages that depends on this given named pkg # TODO
-$app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function ($name, $type) use ($app) {
-    $data = initJapiData($app, 'depends');
-
-    if($type === 'packages') {
-        $res = Depends::find( array( "name = '$name'") );
-        if( ! count($res) > 0) return $app->handle('/404');
-        $pid = $res[0]->pid;
-
-        # ---------------------
-        foreach($res as $d) {
-            $a[] = $d->pid;
-        }
-        $l = trim(implode(',', array_unique($a)), ',');
-        $l = preg_replace('#\,{2}+#', ',', $l);
-        $phql = "SELECT * from Packages where id in ($l) ";
-        $res = $app->modelsManager->executeQuery($phql);
-        $tnum = count($res);
-        $data->meta = array(
-            'files' => $tnum
-        );
-
-        $data->data = fmtData($res, 'packages.', $app)->data;
-        $data = populate_maintainer($data, $app);
-
-        return json_api_encode($data, $app);
-        # ---------------------
-
-        //return $app->handle("/packages/$pid"); # TODO
-    }
-    $app->handle('/404');
-});
-
 // Retrieves contents(files) by id
 $app->get('/contents/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     $data = initJapiData($app, 'contents');
@@ -362,6 +328,40 @@ $app->get('/contents/{id:[0-9]+}/relationships/{type}', function ($id, $type) us
         $res = Files::find( array( "id = '$id'", 'limit' => 1) );
         $pid = $res[0]->pid;
         return $app->handle("/packages/$pid");
+    }
+    $app->handle('/404');
+});
+
+// Retrieves package data by its depends(name) relationships (funny relationships)
+//  possibly taken as packages that depends on this given named pkg # TODO
+$app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function ($name, $type) use ($app) {
+    $data = initJapiData($app, 'depends');
+
+    if($type === 'packages') {
+        $res = Depends::find( array( "name = '$name'") );
+        if( ! count($res) > 0) return $app->handle('/404');
+        $pid = $res[0]->pid;
+
+        # ---------------------
+        foreach($res as $d) {
+            $a[] = $d->pid;
+        }
+        $l = trim(implode(',', array_unique($a)), ',');
+        $l = preg_replace('#\,{2}+#', ',', $l);
+        $phql = "SELECT * from Packages where id in ($l) ";
+        $res = $app->modelsManager->executeQuery($phql);
+        $tnum = count($res);
+        $data->meta = array(
+            'files' => $tnum
+        );
+
+        $data->data = fmtData($res, 'packages.', $app)->data;
+        $data = populate_maintainer($data, $app);
+
+        return json_api_encode($data, $app);
+        # ---------------------
+
+        //return $app->handle("/packages/$pid"); # TODO
     }
     $app->handle('/404');
 });
