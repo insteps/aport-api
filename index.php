@@ -244,72 +244,26 @@ $app->get('/origins/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     return $app->handle("/packages/pid/$pid");
 });
 
-$app->get('/install_if/pid/{pid:[0-9]+}', function ($pid) use ($app) {
-    $data = initJapiData($app, 'install_if');
+$app->get('/{rel:install_if|provides|depends|contents}/pid/{pid:[0-9]+}', function ($rel, $pid) use ($app) {
+    $rels['install_if'] = array("install_if", 'Installif', 'install_if.pid'); # name, className, fmtName
+    $rels['provides'] = array("provides", 'Provides', 'provides.pid');
+    $rels['depends'] = array("depends", 'Depends', 'depends.pid');
+    $rels['contents'] = array("contents", 'Files', 'contents.pid');
+    $_r = $rels[$rel];
+
+    $data = initJapiData($app, $rels[$rel][0]);
     # meta
-    $res = Installif::find();
+    $res = $_r[1]::find();
     $tnum = count($res);
     $data->meta = array(
         'total-files' => $tnum
     );
     # data
-    $res = Installif::find( array( "pid = '$pid'") );
+    $res = $_r[1]::find( array( "pid = '$pid'") );
     $tnum2 = count($res);
     if( ! $tnum2 > 0) return $app->handle('/404');
     $data->meta['pkg-count'] = $tnum2;
-    $data->data = fmtData($res, 'install_if.pid', $app)->data;
-    return json_api_encode($data, $app);
-});
-
-$app->get('/provides/pid/{pid:[0-9]+}', function ($pid) use ($app) {
-    $data = initJapiData($app, 'provides');
-    # meta
-    $res = Provides::find();
-    $tnum = count($res);
-    $data->meta = array(
-        'total-files' => $tnum
-    );
-    # data
-    $res = Provides::find( array( "pid = '$pid'") );
-    $tnum2 = count($res);
-    if( ! $tnum2 > 0) return $app->handle('/404');
-    $data->meta['pkg-count'] = $tnum2;
-    $data->data = fmtData($res, 'provides.pid', $app)->data;
-    return json_api_encode($data, $app);
-});
-
-$app->get('/depends/pid/{pid:[0-9]+}', function ($pid) use ($app) {
-    $data = initJapiData($app, 'depends');
-    # meta
-    $res = Depends::find();
-    $tnum = count($res);
-    $data->meta = array(
-        'total-files' => $tnum
-    );
-    # data
-    $res = Depends::find( array( "pid = '$pid'") );
-    $tnum2 = count($res);
-    if( ! $tnum2 > 0) return $app->handle('/404');
-    $data->meta['pkg-count'] = $tnum2;
-    $data->data = fmtData($res, 'depends.pid', $app)->data;
-    return json_api_encode($data, $app);
-});
-
-// Retrieves contents(files) by id
-$app->get('/contents/pid/{pid:[0-9]+}', function ($pid) use ($app) {
-    $data = initJapiData($app, 'contents');
-    # meta
-    $res = Files::find();
-    $tnum = count($res);
-    $data->meta = array(
-        'total-files' => $tnum
-    );
-    # data
-    $res = Files::find( array( "pid = '$pid'") );
-    $tnum2 = count($res);
-    if( ! $tnum2 > 0) $app->handle('/404');
-    $data->meta['pkg-count'] = $tnum2;
-    $data->data = fmtData($res, 'contents.pid', $app)->data;
+    $data->data = fmtData($res, $_r[2], $app)->data;
     return json_api_encode($data, $app);
 });
 
