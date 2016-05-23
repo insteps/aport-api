@@ -215,9 +215,7 @@ $app->get('/packages/page/{page:[0-9]+}', function ($page) use ($app) {
     $app->handle("/packages");
 });
 
-
-// Retrieves packages by name
-$app->get('/packages/{name:[a-z]{1}[a-z0-9\-\_\.]+}', function ($name) use ($app) {
+$app->get('/packages/name/{name:[a-z]{1}[a-z0-9\-\_\.]+}', function ($name) use ($app) {
     $data = initJapiData($app, 'packages');
 
     $res = Packages::find( array( "name = '$name'", "order" => "id DESC") );
@@ -229,7 +227,11 @@ $app->get('/packages/{name:[a-z]{1}[a-z0-9\-\_\.]+}', function ($name) use ($app
     $data->data = fmtData($res, 'packages.', $app)->data;
     $data = populate_maintainer($data, $app);
     if($data) json_api_encode($data, $app);
+});
 
+// Retrieves packages by name
+$app->get('/packages/{name:[a-z]{1}[a-z0-9\-\_\.]+}', function ($name) use ($app) {
+    return $app->handle("/packages/name/$name");
 });
 
 // Retrieves packages by id
