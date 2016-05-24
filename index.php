@@ -301,8 +301,8 @@ $app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function ($fid, $type) u
 });
 
 
-$app->get('/{rel:install_if|provides|depends|contents
-             |flagged}/pid/{pid:[0-9]+}', function ($rel, $pid) use ($app) {
+$app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}',
+    function ($rel, $pid) use ($app) {
     $rels['install_if'] = array("install_if", 'Installif', 'install_if.pid'); # name, className, fmtName
     $rels['provides'] = array("provides", 'Provides', 'provides.pid');
     $rels['depends'] = array("depends", 'Depends', 'depends.pid');
