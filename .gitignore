@@ -17,4 +17,4 @@ config/urls.db
 feeds/
 run/
 var/
-db/*.db
+db/

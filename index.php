@@ -399,8 +399,8 @@ $app->notFound(function () use ($app) {
     json_api_encode($data, $app);
 });
 
-
-$app->get('/say/welcome/{name}', function ($name) { #for testing
+# for testing
+$app->get('/say/welcome/{name}', function ($name) {
     echo "<h1>Welcome $name!</h1>";
 });
 
@@ -470,21 +470,18 @@ function fmtData($res, $type, $app) {
         $dindentifier = 'fid';
         $list = array( "created", "reporter", "new_version", "message" );
         $relationships = array("packages");
-        $slink = '/' . $type . '/';
     }
 
     if($type === 'install_if') {
         $dindentifier = 'pid';
         $list = array( "name", "version", "operator" );  # hard code list just to remove pid field # TODO
         $relationships = array("packages");
-        $slink = '/' . $type . '/'; # TODO
     }
 
     if($type === 'provides') {
         $dindentifier = 'pid';
         $list = array( "name", "version", "operator" );
         $relationships = array("packages");
-        $slink = '/' . $type . '/';
         //$slink = '/' . 'files' . '/'; # TODO
     }
 
@@ -492,14 +489,12 @@ function fmtData($res, $type, $app) {
         $dindentifier = 'pid';
         $list = array( "name", "version", "operator" );
         $relationships = array("packages");
-        $slink = '/' . $type . '/';
     }
 
     if($type === 'contents') { # from table 'files'
         $dindentifier = 'id';
         $list = array( "file", "path" );
         $relationships = array("packages");
-        $slink = '/' . $type . '/';
     }
 
     if($type === 'packages') {
@@ -511,60 +506,55 @@ function fmtData($res, $type, $app) {
         );
         $relationships = array( "depends", "provides", "install_if",
                                  "origins", "contents", "flagged" );
-        $slink = '/' . $type . '/';
     }
 
-//     if($type === 'install_if'  || $type === 'provides' 
-//        || $type === 'depends'  || $type === 'contents'
-//        || $type === 'packages' || $type === 'flagged'
-//       )
-//       {
-        foreach ($res as $item) {
-            $obj = (object)array();
-            $obj->id = $item->$dindentifier;
-            $obj->type = $type;
-            $obj->links = new stdClass;
+    $slink = '/' . $type . '/';
 
-            foreach($list as $l) {
-                $newitem[$l] = $item->$l;
-            }
-            $obj->attributes = (object)$newitem;
-            if( $subtype === 'pid' ) {
-            } else {
-            }
+    foreach ($res as $item) {
+        $obj = (object)array();
+        $obj->id = $item->$dindentifier;
+        $obj->type = $type;
+        $obj->links = new stdClass;
 
-            # see http://jsonapi.org/format/#document-top-level if still an issue
-            //$jsonApi->data = $obj; # primary data in a single resource identifier object
-            $jsonApi->data[] = $obj; # for more than one object (array)
-
-            # using pid would add name in url, either add id columns to tables
-            #  or deal with weird file names
-
-            if($type == 'contents' || $type === 'packages') {
-                $obj->links->self = $slink.$item->id;
-                $rlink = $slink.$item->id .'/relationships/';
-
-            }
-            if($type === 'install_if' || $type === 'provides' || $type === 'depends') {
-                $obj->links->self = $slink.$item->name;
-                $rlink = $slink.$item->name .'/relationships/';
-            }
-            if($type === 'flagged') {
-                $obj->links->self = $slink.$item->fid;
-                $rlink = $slink.$item->fid .'/relationships/';
-            }
-            // some cleaning
-            $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
-            $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
-
-            # make relationships objects links
-            foreach($relationships as $val) {
-                $rels[$val]['links']['self'] = $rlink.$val;
-            }
-            $obj->relationships = (object)$rels;
+        foreach($list as $l) {
+            $newitem[$l] = $item->$l;
         }
-        return $jsonApi;
-//     }
+        $obj->attributes = (object)$newitem;
+        if( $subtype === 'pid' ) {
+        } else {
+        }
+
+        # see http://jsonapi.org/format/#document-top-level if still an issue
+        //$jsonApi->data = $obj; # primary data in a single resource identifier object
+        $jsonApi->data[] = $obj; # for more than one object (array)
+
+        # using pid would add name in url, either add id columns to tables
+        #  or deal with weird file names
+
+        if($type == 'contents' || $type === 'packages') {
+            $obj->links->self = $slink.$item->id;
+            $rlink = $slink.$item->id .'/relationships/';
+
+        }
+        if($type === 'install_if' || $type === 'provides' || $type === 'depends') {
+            $obj->links->self = $slink.$item->name;
+            $rlink = $slink.$item->name .'/relationships/';
+        }
+        if($type === 'flagged') {
+            $obj->links->self = $slink.$item->fid;
+            $rlink = $slink.$item->fid .'/relationships/';
+        }
+        // some cleaning
+        $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
+        $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
+
+        # make relationships objects links
+        foreach($relationships as $val) {
+            $rels[$val]['links']['self'] = $rlink.$val;
+        }
+        $obj->relationships = (object)$rels;
+    }
+    return $jsonApi;
 
     $app->handle('/404');
 }
@@ -578,5 +568,8 @@ function json_api_encode($data, $app, $flags=array()) {
     echo json_encode($data);
 }
 
+# removes php version numbers, 
+# considered as probable security issue
 header_remove('X-Powered-By');
+
 $app->handle();
