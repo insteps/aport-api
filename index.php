@@ -20,7 +20,11 @@ $url = new Url();
 // Application configuration data
 // -------------------------------
 $config['version'] = '0.0.1';
-// Setting a full domain as base URI
+
+# Setting a full domain as base URI
+# cPhalcon use '_url=' to pass request, 
+#  eg. http://localhost/aport-api/?_url=/
+# use this if .htaccess or url rewrite is unavailable.
 $url->setBaseUri('http://localhost/aport-api');
 
 $config['apiurl'] = $url->getBaseUri();
@@ -244,10 +248,15 @@ $app->get('/packages/{pid:[0-9]+}', function ($pid) use ($app) {
 // Retrieves packages by relationships
 $app->get('/packages/{id:[0-9]+}/relationships/{type}', function ($id, $type) use ($app) {
 
-    $rels = array("origins", "depends", "provides", "install_if", "contents");
-    return $app->handle("/$type/pid/$id");
+    $subtype = 'pid';
 
-    $app->handle('/404');
+    if($type === 'flagged') {
+        $res = Packages::findFirst( array( "id = '$id'", 'limit' => 1) );
+        $id = $res->fid;
+    }
+
+    return $app->handle("/$type/$subtype/$id");
+    //$app->handle('/404');
 
 });
 
@@ -261,26 +270,57 @@ $app->get('/packages/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
+$app->get('/packages/fid/{fid:[0-9]+}', function ($fid) use ($app) {
+    $data = initJapiData($app, 'packages');
+
+    $res = Packages::find( array( "fid = '$fid'", "order" => "id DESC") );
+    $tnum = count($res);
+    if($tnum < 1) { $app->handle('/404'); return; }
+
+    $data->meta = array(
+        'count' => $tnum
+    );
+    $data->data = fmtData($res, 'packages.', $app)->data;
+    $data = populate_maintainer($data, $app);
+    if($data) json_api_encode($data, $app);
+});
+
 $app->get('/origins/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     return $app->handle("/packages/pid/$pid");
 });
 
-$app->get('/{rel:install_if|provides|depends|contents}/pid/{pid:[0-9]+}', function ($rel, $pid) use ($app) {
+$app->get('/flagged/fid/{fid:[0-9]+}', function ($fid) use ($app) {
+    return $app->handle("/flagged/pid/$fid");
+});
+
+$app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function ($fid, $type) use ($app) {
+    if($type === 'packages') {
+        return $app->handle("/packages/fid/$fid");
+    }
+    $app->handle('/404');
+});
+
+
+$app->get('/{rel:install_if|provides|depends|contents
+             |flagged}/pid/{pid:[0-9]+}', function ($rel, $pid) use ($app) {
     $rels['install_if'] = array("install_if", 'Installif', 'install_if.pid'); # name, className, fmtName
     $rels['provides'] = array("provides", 'Provides', 'provides.pid');
     $rels['depends'] = array("depends", 'Depends', 'depends.pid');
     $rels['contents'] = array("contents", 'Files', 'contents.pid');
+    $rels['flagged'] = array("flagged", 'Flagged', 'flagged.fid');
     $_r = $rels[$rel];
+    list($type, $subtype) = explode('.', $_r[2]);
 
     $data = initJapiData($app, $_r[0]);
     # meta
     $res = $_r[1]::find();
     $tnum = count($res);
+
     $data->meta = array(
         'total-files' => $tnum
     );
     # data
-    $res = $_r[1]::find( array( "pid = '$pid'") );
+    $res = $_r[1]::find( array( "$subtype = '$pid'") );
     $tnum2 = count($res);
     if( ! $tnum2 > 0) return $app->handle('/404');
     $data->meta['pkg-count'] = $tnum2;
@@ -426,6 +466,13 @@ function fmtData($res, $type, $app) {
     list($type, $subtype) = explode('.', $type);
     $jsonApi = (object)array();
 
+    if($type === 'flagged') {
+        $dindentifier = 'fid';
+        $list = array( "created", "reporter", "new_version", "message" );
+        $relationships = array("packages");
+        $slink = '/' . $type . '/';
+    }
+
     if($type === 'install_if') {
         $dindentifier = 'pid';
         $list = array( "name", "version", "operator" );  # hard code list just to remove pid field # TODO
@@ -460,17 +507,18 @@ function fmtData($res, $type, $app) {
         $list = array( # hard code list just to remove id field # TODO
              "license", "arch", "build_time", "maintainer", "checksum",
              "version", "installed_size", "branch", "size", "commit",
-             "origin", "url", "repo", "name", "description"
+             "origin", "url", "repo", "name", "description", "fid"
         );
-        $relationships = array("depends", "provides", "install_if", "origins", "contents");
+        $relationships = array( "depends", "provides", "install_if",
+                                 "origins", "contents", "flagged" );
         $slink = '/' . $type . '/';
     }
 
-    if($type === 'install_if'  || $type === 'provides' 
-       || $type === 'depends'  || $type === 'contents'
-       || $type === 'packages'
-      )
-      {
+//     if($type === 'install_if'  || $type === 'provides' 
+//        || $type === 'depends'  || $type === 'contents'
+//        || $type === 'packages' || $type === 'flagged'
+//       )
+//       {
         foreach ($res as $item) {
             $obj = (object)array();
             $obj->id = $item->$dindentifier;
@@ -496,9 +544,14 @@ function fmtData($res, $type, $app) {
                 $obj->links->self = $slink.$item->id;
                 $rlink = $slink.$item->id .'/relationships/';
 
-            } else {
+            }
+            if($type === 'install_if' || $type === 'provides' || $type === 'depends') {
                 $obj->links->self = $slink.$item->name;
                 $rlink = $slink.$item->name .'/relationships/';
+            }
+            if($type === 'flagged') {
+                $obj->links->self = $slink.$item->fid;
+                $rlink = $slink.$item->fid .'/relationships/';
             }
             // some cleaning
             $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
@@ -511,7 +564,7 @@ function fmtData($res, $type, $app) {
             $obj->relationships = (object)$rels;
         }
         return $jsonApi;
-    }
+//     }
 
     $app->handle('/404');
 }
