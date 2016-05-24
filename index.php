@@ -221,10 +221,10 @@ $app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function ($name) use ($app) {
     $res = Packages::find( array( "name = '$name'", "order" => "id DESC") );
     $tnum = count($res);
     if($tnum < 1) { $app->handle('/404'); return; }
+
     $data->meta = array(
         'count' => $tnum
     );
-
     $data->data = fmtData($res, 'packages.', $app)->data;
     $data = populate_maintainer($data, $app);
     if($data) json_api_encode($data, $app);
@@ -521,7 +521,7 @@ function json_api_encode($data, $app, $flags=array()) {
     //$response = new Phalcon\Http\Response();
 
     //enable in production
-    //$app->response->setContentType($header['japi'])->sendHeaders();
+    $app->response->setContentType($header['japi'])->sendHeaders();
     echo json_encode($data);
 }
 
