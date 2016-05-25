@@ -42,6 +42,7 @@ $config['mysql']["persistent"] = false;
 $config['sqlite'] = array(
     "dbname" => "db/aports.db"
 );
+
 $config['dbtype'] = 'sqlite';
 
 $config['app']['pglimit'] = 50; #default items per page
@@ -380,22 +381,33 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function ($name, $typ
 });
 
 
+# Error Responses
+# --------------------------
+
+# Error Responses 404
 $app->notFound(function () use ($app) {
     $app->response->setStatusCode(404, "Not Found")->sendHeaders();
-    //$slink = $app->config['apiurl'].$app->request->get('_url');
-    $data['jsonapi'] = array('version' => '1.0');
-    $data['error'][] = array(
-        'status' => '404',
-        'source' => (object)array(
-                        'pointer' => $app->request->get('_url'),
-                        //"parameter" => "include",
-                    ),
-        'title' => '404 - Page Not Found',
-        'detail' => 'This is crazy, but this page was not found!'
-    );
-
+    $data = initJapiErrData($app, 
+      array( '404', 'Not Acceptable', 'This is crazy, but this page was not found!' ));
     json_api_encode($data, $app);
 });
+
+
+# Error Responses 406
+$app->get('/406', function () use ($app) {
+    $app->response->setStatusCode(406, "Not Acceptable")->sendHeaders();
+    $data = initJapiErrData($app, array( '406', 'Not Acceptable', '' ));
+    json_api_encode($data, $app);
+});
+
+# Error Responses 415
+$app->get('/415', function () use ($app) {
+    $app->response->setStatusCode(415, "Unsupported Media Type")->sendHeaders();
+    $data = initJapiErrData($app, array( '415', 'Unsupported Media Type', '' ));
+    json_api_encode($data, $app);
+});
+
+# --------------------------
 
 # for testing
 $app->get('/say/welcome/{name}', function ($name) {
@@ -454,6 +466,22 @@ function initJapiData($app, $type='') {
     $_reqUrl = cleanUri($app->request->get('_url'));
     $data->links = (object)array();
     $data->links->self = $app->config['apiurl'] . $_reqUrl;
+    return $data;
+}
+
+function initJapiErrData($app, $type=array()) {
+    //$slink = $app->config['apiurl'].$app->request->get('_url');
+    $data = (object)array();
+    $data->jsonapi = array('version' => '1.0');
+    $data->error[] = array(
+        'status' => @$type[0],
+        'source' => (object)array(
+                        'pointer' => $app->request->get('_url'),
+                        //"parameter" => "include",
+                    ),
+        'title' => @$type[1],
+        'detail' => @$type[2]
+    );
     return $data;
 }
 
