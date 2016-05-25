@@ -23,7 +23,7 @@ $config['version'] = '0.0.1';
 
 # Setting a full domain as base URI
 # cPhalcon use '_url=' to pass request, 
-#  eg. http://localhost/aport-api/?_url=/
+#  eg. http://localhost/aport-api/?_url=
 # use this if .htaccess or url rewrite is unavailable.
 $url->setBaseUri('http://localhost/aport-api');
 
@@ -97,15 +97,13 @@ $app->get('/', function () {
 });
 
 $app->get('/about', function () use ($app, $config) {
-    $data = array();
-    $data['jsonapi'] = array('version' => '1.0');
-    $data['meta'] = array (
+    $data = initJapiData($app, 'about');
+    $data->meta = array(
         'version' => $config['version'],
         'backend' => '',
         'apiurl' => $config['apiurl']
     );
-    $data['links'] = array( 'self' => $config['apiurl'].'/about' );
-    $data['data'][] = (object)array();
+    $data->data[] = (object)array();
     json_api_encode($data, $app);
 });
 
