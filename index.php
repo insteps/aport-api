@@ -12,6 +12,7 @@
 use Phalcon\Loader;
 use Phalcon\Mvc\Url;
 use Phalcon\Mvc\Micro;
+use Phalcon\Events\Manager as EventsManager;
 use Phalcon\Di\FactoryDefault;
 use Phalcon\Db\Adapter\Pdo\Mysql as PdoMysql;
 use Phalcon\Db\Adapter\Pdo\Sqlite as PdoSqlite;
@@ -71,12 +72,39 @@ if( $config['dbtype'] === 'mysql' ) {
     });
 }
 
+
+// Create a events manager
+$eventsManager = new EventsManager();
+
+// Listen all the application events
+$eventsManager->attach('micro', function ($event, $app) {
+    if ($event->getType() === 'beforeExecuteRoute') {
+    }
+});
+
+
+// Start application
+// -------------------------------
+
 //$app = new Micro();
 $app = new \Phalcon\Mvc\Micro($di);
 $app->config = $config;
 $app->myapi = new stdClass;
 $app->myapi->pglimit = $config['app']['pglimit'];
 $app->myapi->_reqUrl = $app->request->get('_url'); #set default _reqUrl
+
+// Bind the events manager to the app
+$app->setEventsManager($eventsManager);
+
+$app->before(function () use ($app) {
+    //$_url = $app->request->get('_url');
+    // This is executed when the request has been served
+    //echo "<h1>Welcome !! </h1>The Json API for Alpine Linux aports.\n";
+    //throw new \Exception("An error");
+    //print_r($_GET);
+    //return false;
+});
+
 
 // Define routes here
 // ====================
@@ -381,26 +409,40 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function ($name, $typ
 });
 
 
-# Error Responses
+# Error Handling / Responses
 # --------------------------
 
-# Error Responses 404
-$app->notFound(function () use ($app) {
-    $app->response->setStatusCode(404, "Not Found")->sendHeaders();
+# Error $exceptions # TODO
+$app->error(
+    function ($exception) {
+        echo "An error has occurred";
+    }
+);
+
+# Error Response 401
+$app->get('/401', function () use ($app) {
+    $app->response->setStatusCode(401, "Unauthorized")->sendHeaders();
     $data = initJapiErrData($app, 
-      array( '404', 'Not Acceptable', 'This is crazy, but this page was not found!' ));
+      array( '401', 'Access is not authorized', '' ));
     json_api_encode($data, $app);
 });
 
+# Error Response 404
+$app->notFound(function () use ($app) {
+    $app->response->setStatusCode(404, "Not Found")->sendHeaders();
+    $data = initJapiErrData($app, 
+      array( '404', '404 - Page Not Found', 'This is crazy, but this page was not found!' ));
+    json_api_encode($data, $app);
+});
 
-# Error Responses 406
+# Error Response 406
 $app->get('/406', function () use ($app) {
     $app->response->setStatusCode(406, "Not Acceptable")->sendHeaders();
     $data = initJapiErrData($app, array( '406', 'Not Acceptable', '' ));
     json_api_encode($data, $app);
 });
 
-# Error Responses 415
+# Error Response 415
 $app->get('/415', function () use ($app) {
     $app->response->setStatusCode(415, "Unsupported Media Type")->sendHeaders();
     $data = initJapiErrData($app, array( '415', 'Unsupported Media Type', '' ));
