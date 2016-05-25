@@ -96,7 +96,7 @@ $app->get('/', function () {
     echo "<h1>Welcome !! </h1>The Json API for Alpine Linux aports.\n";
 });
 
-$app->get('/about', function () use ($config) {
+$app->get('/about', function () use ($app, $config) {
     $data = array();
     $data['jsonapi'] = array('version' => '1.0');
     $data['meta'] = array (
@@ -106,11 +106,11 @@ $app->get('/about', function () use ($config) {
     );
     $data['links'] = array( 'self' => $config['apiurl'].'/about' );
     $data['data'][] = (object)array();
-    json_api_encode($data, $this);
+    json_api_encode($data, $app);
 });
 
 $app->get('/docs', function () {
-    echo "<h1>Api Documents</h1>Todo.";
+    echo "<h1>Api Documents</h1>Todo.\n";
 });
 
 /*
