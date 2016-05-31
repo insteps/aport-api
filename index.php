@@ -46,7 +46,8 @@ $config['sqlite'] = array(
 
 $config['dbtype'] = 'sqlite';
 
-$config['app']['pglimit'] = 50; #default items per page
+# default items per page
+$config['app']['pglimit'] = 50;
 // -------------------------------
 
 // Use Loader() to autoload our model
@@ -146,22 +147,22 @@ The Aports API consists of the following methods: # TODO - clean text import fro
 
   Method  | URL                                    | Action
   ------------------------------------------------------------------------------------------------
-  GET     | /$                                     | web.RedirectHandler, {"/packages"}
-  GET     | /packages/(.*)/relationships/contents$ | ApiRelationshipsContentRenderer, {aports=aports,model=model}
-  GET     | /packages/(.*)/relationships/(.*)$     | ApiPackagesRelationship, {aports=aports,model=model}
-  GET     | /packages/(.*)$                        | ApiPackageRenderer {aports=aports,model=model}
-  GET     | /packages                              | ApiPackagesRenderer {aports=aports,model=model}
+  GET     | /$                                     | Json api welcome page
+  GET     | /packages/(.*)/relationships/contents$ | Packages->Content relationships, {pid}
+  GET     | /packages/(.*)/relationships/(.*)$     | Packages relationship, {pid} {install_if|provides|depends|contents|flagged}
+  GET     | /packages/(.*)$                        | ApiPackageRenderer {pid}
+  GET     | /packages                              | ApiPackagesRenderer - default page, new pkg on top
   GET     | /packages/page/<num>                   | Paginated object for packages
   --contents --------------
-  GET     | /contents/(.*)/relationships/packages$ | ApiRelationshipsPackagesRenderer, {aports=aports,model=model}
-  GET     | /contents/(.*)$                        | ApiContentRenderer {aports=aports,model=model}
-  GET     | /contents                              | ApiContentsRenderer {aports=aports,model=model}
+  GET     | /contents/(.*)/relationships/packages$ | Content->Packages relationships, {id}
+  GET     | /contents/(.*)$                        | ApiContentRenderer {id}
+  GET     | /contents                              | ApiContentsRenderer
   --static ----------------
   GET     | favicon.ico                            | web.StaticFileHandler, "assets/favicon.ico"
   --others ----------------
-  DELETE  | /api/test/100                          | 
-  POST    | /api/add/10                            | 
-  PUT     | /api/add/10                            | 
+  DELETE  | /api/test/100                          | ...
+  POST    | /api/add/10                            | ...
+  PUT     | /api/add/10                            | ...
 
 */
 
@@ -461,6 +462,17 @@ $app->get('/say/welcome/{name}', function ($name) {
  Utility functions
  -----------------
 */
+
+function isJapiReqHeader($app) { # TODO
+    // Get 'Accept:' header
+    //$request = new \Phalcon\Http\Request();
+    //$_h_accept = $request->getBestAccept(); # getAcceptableContent
+    $_h_accept = (array)$app->request->getAcceptableContent();
+    return $_h_accept;
+    if ($_h_accept == "application/vnd.api+json") {
+        echo "A json request";
+    }
+}
 
 function cleanUri($_reqUrl) {
     //$_reqUrl = $app->request->get('_url');
