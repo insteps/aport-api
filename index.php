@@ -98,13 +98,14 @@ $app->myapi->_reqUrl = $app->request->get('_url'); #set default _reqUrl
 $app->setEventsManager($eventsManager);
 
 $app->before(function() use ($app) {
-    //$_url = $app->request->get('_url');
     // This is executed when the request has been served
-    //echo "<h1>Welcome !! </h1>The Json API for Alpine Linux aports.\n";
+    $_reqMethod = $app->request->getMethod();
+    //$_url = $app->request->get('_url');
     //throw new \Exception("An error");
     //print_r($_GET);
     //return false;
 });
+
 
 
 // Define routes here
@@ -158,7 +159,7 @@ The Aports API consists of the following methods: # TODO - clean text import fro
   GET     | /contents/(.*)$                        | ApiContentRenderer {id}
   GET     | /contents                              | ApiContentsRenderer
   --static ----------------
-  GET     | favicon.ico                            | web.StaticFileHandler, "assets/favicon.ico"
+  GET     | /assets/*                              | static files, eg. "assets/favicon.ico"
   --others ----------------
   DELETE  | /api/test/100                          | ...
   POST    | /api/add/10                            | ...
@@ -223,8 +224,8 @@ $app->get('/packages', function() use ($app) {
 // Retrieves packages by paginations (defaults)
 $app->get('/packages/page', function() use ($app) {
     $app->myapi->offset = 0;
-    $app->myapi->pgNext = 2;
     $app->myapi->pgPrev = 1;
+    $app->myapi->pgNext = 2;
     $app->handle("/packages");
 });
 
@@ -468,13 +469,19 @@ function isJapiReqHeader($app) { # TODO
     // ---------------------------
     //$request = new \Phalcon\Http\Request();
     //$_h_accept = $request->getBestAccept(); # getAcceptableContent
+
+    // Get the best acceptable content by the browser. ie text/xml
     $_h_accept = (array)$app->request->getAcceptableContent();
-    return $_h_accept;
+
+    // Get 'Content-Type:' header
+    // ---------------------------
+    $_h_ctype = $app->request->getHeader('content-type');
+
+    return $_h_ctype;
     if ($_h_accept == "application/vnd.api+json") {
         echo "A json request";
     }
-    // Get 'Content-Type:' header
-    // ---------------------------
+
 }
 
 function cleanUri($_reqUrl) {
