@@ -63,12 +63,12 @@ $di = new FactoryDefault();
 
 if( $config['dbtype'] === 'mysql' ) {
     // Set up the database service (mysql)
-    $di->set('dbMysql', function () use ($config){
+    $di->set('dbMysql', function() use ($config){
         return new PdoMysql($config['mysql']);
     });
 } else {
     // Set up the database service (sqlite)
-    $di->set('dbSqlite', function () use ($config){
+    $di->set('dbSqlite', function() use ($config){
         return new PdoSqlite($config['sqlite']);
     });
 }
@@ -78,7 +78,7 @@ if( $config['dbtype'] === 'mysql' ) {
 $eventsManager = new EventsManager();
 
 // Listen all the application events
-$eventsManager->attach('micro', function ($event, $app) {
+$eventsManager->attach('micro', function($event, $app) {
     if ($event->getType() === 'beforeExecuteRoute') {
     }
 });
@@ -97,7 +97,7 @@ $app->myapi->_reqUrl = $app->request->get('_url'); #set default _reqUrl
 // Bind the events manager to the app
 $app->setEventsManager($eventsManager);
 
-$app->before(function () use ($app) {
+$app->before(function() use ($app) {
     //$_url = $app->request->get('_url');
     // This is executed when the request has been served
     //echo "<h1>Welcome !! </h1>The Json API for Alpine Linux aports.\n";
@@ -122,11 +122,11 @@ The Site related API consists of the following methods:
 
 */
 
-$app->get('/', function () {
+$app->get('/', function() {
     echo "<h1>Welcome !! </h1>The Json API for Alpine Linux aports.\n";
 });
 
-$app->get('/about', function () use ($app, $config) {
+$app->get('/about', function() use ($app, $config) {
     $data = initJapiData($app, 'about');
     $data->meta = array(
         'version' => $config['version'],
@@ -137,7 +137,7 @@ $app->get('/about', function () use ($app, $config) {
     json_api_encode($data, $app);
 });
 
-$app->get('/docs', function () {
+$app->get('/docs', function() {
     echo "<h1>Api Documents</h1>Todo.\n";
 });
 
@@ -167,7 +167,7 @@ The Aports API consists of the following methods: # TODO - clean text import fro
 */
 
 // Retrieves packages
-$app->get('/packages', function () use ($app) {
+$app->get('/packages', function() use ($app) {
 
     $data = initJapiData($app, 'packages');
 
@@ -221,7 +221,7 @@ $app->get('/packages', function () use ($app) {
 });
 
 // Retrieves packages by paginations (defaults)
-$app->get('/packages/page', function () use ($app) {
+$app->get('/packages/page', function() use ($app) {
     $app->myapi->offset = 0;
     $app->myapi->pgNext = 2;
     $app->myapi->pgPrev = 1;
@@ -229,7 +229,7 @@ $app->get('/packages/page', function () use ($app) {
 });
 
 // Retrieves packages by paginations
-$app->get('/packages/page/{page:[0-9]+}', function ($page) use ($app) {
+$app->get('/packages/page/{page:[0-9]+}', function($page) use ($app) {
     $page = (int)$page;
 
     $limit = $app->myapi->pglimit;
@@ -247,7 +247,7 @@ $app->get('/packages/page/{page:[0-9]+}', function ($page) use ($app) {
     $app->handle("/packages");
 });
 
-$app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function ($name) use ($app) {
+$app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
     $data = initJapiData($app, 'packages');
 
     $res = Packages::find( array( "name = '$name'", "order" => "id DESC") );
@@ -263,18 +263,18 @@ $app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function ($name) use ($app) {
 });
 
 // Retrieves packages by name
-$app->get('/packages/{name:[a-z0-9\-\_\.]+}', function ($name) use ($app) {
+$app->get('/packages/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
     return $app->handle("/packages/name/$name");
 });
 
 // Retrieves packages by id
 // would override /packages/{name} if name is all digits
-$app->get('/packages/{pid:[0-9]+}', function ($pid) use ($app) {
+$app->get('/packages/{pid:[0-9]+}', function($pid) use ($app) {
     return $app->handle("/packages/pid/$pid");
 });
 
 // Retrieves packages by relationships
-$app->get('/packages/{id:[0-9]+}/relationships/{type}', function ($id, $type) use ($app) {
+$app->get('/packages/{id:[0-9]+}/relationships/{type}', function($id, $type) use ($app) {
 
     $subtype = 'pid';
 
@@ -289,7 +289,7 @@ $app->get('/packages/{id:[0-9]+}/relationships/{type}', function ($id, $type) us
 });
 
 // Retrieves packages by id
-$app->get('/packages/pid/{pid:[0-9]+}', function ($pid) use ($app) {
+$app->get('/packages/pid/{pid:[0-9]+}', function($pid) use ($app) {
     $data = initJapiData($app, 'packages');
 
     $res = Packages::find( array( "id = '$pid'", 'limit' => 1) );
@@ -298,7 +298,7 @@ $app->get('/packages/pid/{pid:[0-9]+}', function ($pid) use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
-$app->get('/packages/fid/{fid:[0-9]+}', function ($fid) use ($app) {
+$app->get('/packages/fid/{fid:[0-9]+}', function($fid) use ($app) {
     $data = initJapiData($app, 'packages');
 
     $res = Packages::find( array( "fid = '$fid'", "order" => "id DESC") );
@@ -313,15 +313,15 @@ $app->get('/packages/fid/{fid:[0-9]+}', function ($fid) use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
-$app->get('/origins/pid/{pid:[0-9]+}', function ($pid) use ($app) {
+$app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
     return $app->handle("/packages/pid/$pid");
 });
 
-$app->get('/flagged/fid/{fid:[0-9]+}', function ($fid) use ($app) {
+$app->get('/flagged/fid/{fid:[0-9]+}', function($fid) use ($app) {
     return $app->handle("/flagged/pid/$fid");
 });
 
-$app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function ($fid, $type) use ($app) {
+$app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function($fid, $type) use ($app) {
     if($type === 'packages') {
         return $app->handle("/packages/fid/$fid");
     }
@@ -330,7 +330,7 @@ $app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function ($fid, $type) u
 
 
 $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}',
-    function ($rel, $pid) use ($app) {
+    function($rel, $pid) use ($app) {
     $rels['install_if'] = array("install_if", 'Installif', 'install_if.pid'); # name, className, fmtName
     $rels['provides'] = array("provides", 'Provides', 'provides.pid');
     $rels['depends'] = array("depends", 'Depends', 'depends.pid');
@@ -357,7 +357,7 @@ $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}'
 });
 
 // Retrieves contents(files) by id
-$app->get('/contents/id/{id:[0-9]+}', function ($id) use ($app) {
+$app->get('/contents/id/{id:[0-9]+}', function($id) use ($app) {
     $data = initJapiData($app, 'contents');
     $res = Files::find( array( "id = '$id'", 'limit' => 1) );
     if( ! count($res) > 0) return $app->handle('/404');
@@ -366,7 +366,7 @@ $app->get('/contents/id/{id:[0-9]+}', function ($id) use ($app) {
 });
 
 // Retrieves package data by its content(files->id) relationships
-$app->get('/contents/{id:[0-9]+}/relationships/{type}', function ($id, $type) use ($app) {
+$app->get('/contents/{id:[0-9]+}/relationships/{type}', function($id, $type) use ($app) {
     if($type === 'packages') {
         $res = Files::find( array( "id = '$id'", 'limit' => 1) );
         $pid = $res[0]->pid;
@@ -377,7 +377,7 @@ $app->get('/contents/{id:[0-9]+}/relationships/{type}', function ($id, $type) us
 
 // Retrieves package data by its depends(name) relationships (funny relationships)
 //  possibly taken as packages that depends on this given named pkg # TODO
-$app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function ($name, $type) use ($app) {
+$app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function($name, $type) use ($app) {
     $data = initJapiData($app, 'depends');
 
     if($type === 'packages') {
@@ -415,13 +415,13 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function ($name, $typ
 
 # Error $exceptions # TODO
 $app->error(
-    function ($exception) {
+    function($exception) {
         echo "An error has occurred";
     }
 );
 
 # Error Response 401
-$app->get('/401', function () use ($app) {
+$app->get('/401', function() use ($app) {
     $app->response->setStatusCode(401, "Unauthorized")->sendHeaders();
     $data = initJapiErrData($app, 
       array( '401', 'Access is not authorized', '' ));
@@ -429,7 +429,7 @@ $app->get('/401', function () use ($app) {
 });
 
 # Error Response 404
-$app->notFound(function () use ($app) {
+$app->notFound(function() use ($app) {
     $app->response->setStatusCode(404, "Not Found")->sendHeaders();
     $data = initJapiErrData($app, 
       array( '404', '404 - Page Not Found', 'This is crazy, but this page was not found!' ));
@@ -437,14 +437,14 @@ $app->notFound(function () use ($app) {
 });
 
 # Error Response 406
-$app->get('/406', function () use ($app) {
+$app->get('/406', function() use ($app) {
     $app->response->setStatusCode(406, "Not Acceptable")->sendHeaders();
     $data = initJapiErrData($app, array( '406', 'Not Acceptable', '' ));
     json_api_encode($data, $app);
 });
 
 # Error Response 415
-$app->get('/415', function () use ($app) {
+$app->get('/415', function() use ($app) {
     $app->response->setStatusCode(415, "Unsupported Media Type")->sendHeaders();
     $data = initJapiErrData($app, array( '415', 'Unsupported Media Type', '' ));
     json_api_encode($data, $app);
@@ -453,7 +453,7 @@ $app->get('/415', function () use ($app) {
 # --------------------------
 
 # for testing
-$app->get('/say/welcome/{name}', function ($name) {
+$app->get('/say/welcome/{name}', function($name) {
     echo "<h1>Welcome $name!</h1>";
 });
 
@@ -465,6 +465,7 @@ $app->get('/say/welcome/{name}', function ($name) {
 
 function isJapiReqHeader($app) { # TODO
     // Get 'Accept:' header
+    // ---------------------------
     //$request = new \Phalcon\Http\Request();
     //$_h_accept = $request->getBestAccept(); # getAcceptableContent
     $_h_accept = (array)$app->request->getAcceptableContent();
@@ -472,6 +473,8 @@ function isJapiReqHeader($app) { # TODO
     if ($_h_accept == "application/vnd.api+json") {
         echo "A json request";
     }
+    // Get 'Content-Type:' header
+    // ---------------------------
 }
 
 function cleanUri($_reqUrl) {
