@@ -382,6 +382,12 @@ $app->get('/contents/{id:[0-9]+}/relationships/{type}', function($id, $type) use
     $app->handle('/404');
 });
 
+// Seems depends would only have a relationship with packages
+// this route can be directed to below route
+$app->get('/depends/{name:[a-z]+.*}', function($name) use ($app) {
+    $app->handle("/depends/$name/relationships/packages");
+});
+
 // Retrieves package data by its depends(name) relationships (funny relationships)
 //  possibly taken as packages that depends on this given named pkg # TODO
 $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function($name, $type) use ($app) {
