@@ -286,7 +286,7 @@ $app->get('/flagged', function() use ($app) {
     $tnum = count($res);
 
     $parturi = $app->request->get()['_url'];
-    if( ! $parturi === '/flagged/new') {
+    if( $parturi !== '/flagged/new') {
         setPageLinks('page', $tnum, $data, $app);
     }
 
