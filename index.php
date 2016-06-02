@@ -285,7 +285,10 @@ $app->get('/flagged', function() use ($app) {
     $res = Flagged::find();
     $tnum = count($res);
 
-    setPageLinks('page', $tnum, $data, $app);
+    $parturi = $app->request->get()['_url'];
+    if( ! $parturi === '/flagged/new') {
+        setPageLinks('page', $tnum, $data, $app);
+    }
 
     $res = Flagged::find(
         array(
@@ -300,6 +303,12 @@ $app->get('/flagged', function() use ($app) {
 
 });
 
+// Retrieves flagged (latest)
+$app->get('/flagged/new', function($page) use ($app) {
+    $app->myapi->pglimit = 1;
+    $app->handle("/flagged");
+});
+
 // Retrieves flagged by paginations (defaults)
 $app->get('/flagged/page', function($page) use ($app) {
     $app->handle("/flagged");
@@ -309,6 +318,10 @@ $app->get('/flagged/page', function($page) use ($app) {
 $app->get('/flagged/page/{page:[0-9]+}', function($page) use ($app) {
     $app->myapi->reqPage = (int)$page;
     $app->handle("/flagged");
+});
+
+$app->get('/flagged/{fid:[0-9]+}', function($fid) use ($app) {
+    return $app->handle("/flagged/pid/$fid");
 });
 
 $app->get('/flagged/fid/{fid:[0-9]+}', function($fid) use ($app) {
