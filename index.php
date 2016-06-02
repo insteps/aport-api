@@ -666,8 +666,8 @@ function fmtData($res, $type, $app) {
 
     foreach ($res as $item) {
         $obj = (object)array();
-        $obj->id = $item->$dindentifier;
         $obj->type = $type;
+        $obj->id = $item->$dindentifier;
         $obj->links = new stdClass;
 
         foreach($list as $l) {
