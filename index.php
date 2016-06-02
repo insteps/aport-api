@@ -172,46 +172,17 @@ $app->get('/packages', function() use ($app) {
 
     $data = initJapiData($app, 'packages');
 
-    # get Packages count and figure out paginations
-    $first = "1"; $next = "2";
-    $limit = $app->myapi->pglimit;
+    # get Packages count
     $res = Packages::find();
     $tnum = count($res);
-    $tpgs = floor($tnum/$limit);
-    $mod = $tnum%$limit;
-    if($mod > 0) $tpgs = $tpgs+1;
 
-    $offset = isset($app->myapi->offset) ? $app->myapi->offset : 0;
-
-    $data->meta = array(
-        'total-pages' => $tpgs,
-        'per-page' => $app->myapi->pglimit,
-        'count' => $tnum
-    );
-
-    $_reqUrl = cleanUri($app->request->get('_url'));
-    //$app->myapi->_reqUrl = $_reqUrl;
-
-    if( isset($app->myapi->offset) ) {
-      $slink = preg_replace('#\/page.*$#', '', $_reqUrl);
-      $next = $app->myapi->pgNext;
-      $app->myapi->_reqUrl = $slink;
-    } else {
-      $slink = $_reqUrl;
-    }
-    $slink = $app->config['apiurl'] . $slink;
-
-    $data->links = (object)array();
-    $data->links->self = $app->config['apiurl'] . $_reqUrl;
-    $data->links->next = $slink.'/page/'.$next;
-    $data->links->last = $slink.'/page/'.$tpgs;
-    $data->links->first = $slink.'/page/'.$first;
+    setPageLinks('page', $tnum, $data, $app);
 
     $res = Packages::find(
         array(
             "order" => "id DESC",
-            "limit" => $limit,
-            "offset" => "$offset"
+            "limit" => $app->myapi->pglimit,
+            "offset" => $app->myapi->offset
         )
     );
     $data->data = fmtData($res, 'packages.', $app)->data;
@@ -221,33 +192,19 @@ $app->get('/packages', function() use ($app) {
 
 });
 
-// Retrieves packages by paginations (defaults)
-$app->get('/packages/page', function() use ($app) {
-    $app->myapi->offset = 0;
-    $app->myapi->pgPrev = 1;
-    $app->myapi->pgNext = 2;
+// Retrieves packages by paginations
+$app->get('/packages/page/{page:[0-9]+}', function($page) use ($app) {
+    $app->myapi->reqPage = (int)$page;
     $app->handle("/packages");
 });
 
-// Retrieves packages by paginations
-$app->get('/packages/page/{page:[0-9]+}', function($page) use ($app) {
+// Retrieves packages by name
+$app->get('/packages/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
+    // Retrieves packages by paginations (defaults)
+    if($name === 'page') { return $app->handle("/packages"); }
 
-    $res = Packages::find();
-
-    $page = (int)$page;
-    $limit = $app->myapi->pglimit;
-    $tnum = count($res);
-    $tpgs = floor($tnum/$limit);
-    $mod = $tnum%$limit;
-    if($mod > 0) $tpgs = $tpgs+1;
-    if($page > $tpgs) return $app->handle('/404');
-
-    $multiplier = ($page <= 1) ? 0 : $page-1;
-    $app->myapi->offset = $multiplier * $app->myapi->pglimit;
-    $app->myapi->pgNext = ($page+1 > $tpgs) ? $page : $page+1;
-    $app->myapi->pgPrev = ($page-1 <= 0) ? 1 : $page-1;
-
-    $app->handle("/packages");
+    // assuming there is no pkg named 'page'
+    return $app->handle("/packages/name/$name");
 });
 
 $app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
@@ -263,11 +220,6 @@ $app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
     $data->data = fmtData($res, 'packages.', $app)->data;
     $data = populate_maintainer($data, $app);
     if($data) json_api_encode($data, $app);
-});
-
-// Retrieves packages by name
-$app->get('/packages/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
-    return $app->handle("/packages/name/$name");
 });
 
 // Retrieves packages by id
@@ -327,13 +279,17 @@ $app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
 $app->get('/flagged', function() use ($app) {
     $data = initJapiData($app, 'flagged');
 
-    $limit = 50; $offset = 0;
+    # get Packages count
+    $res = Flagged::find();
+    $tnum = count($res);
+
+    setPageLinks('page', $tnum, $data, $app);
 
     $res = Flagged::find(
         array(
             "order" => "created DESC",
-            "limit" => $limit,
-            "offset" => "$offset"
+            "limit" => $app->myapi->pglimit,
+            "offset" => $app->myapi->offset
         )
     );
     $data->data = fmtData($res, 'flagged.', $app)->data;
@@ -344,14 +300,13 @@ $app->get('/flagged', function() use ($app) {
 
 // Retrieves flagged by paginations (defaults)
 $app->get('/flagged/page', function($page) use ($app) {
-    $app->myapi->offset = 0;
-    $app->myapi->pgPrev = 1;
-    $app->myapi->pgNext = 2;
     $app->handle("/flagged");
 });
 
 // Retrieves flagged by paginations
 $app->get('/flagged/page/{page:[0-9]+}', function($page) use ($app) {
+    $app->myapi->reqPage = (int)$page;
+    $app->handle("/flagged");
 });
 
 $app->get('/flagged/fid/{fid:[0-9]+}', function($fid) use ($app) {
@@ -530,6 +485,89 @@ function cleanUri($_reqUrl) {
     return preg_replace($pat, $rep, $_reqUrl);
 }
 
+function initJapiData($app, $type='') {
+    $data = (object)array();
+    # misc top level json api objects (non standards)
+    $data->jsonapi = array('version' => '1.0');
+    $data->meta = (object)array();
+
+    $_reqUrl = cleanUri($app->request->get('_url'));
+    $data->links = (object)array();
+    $data->links->self = $app->config['apiurl'] . $_reqUrl;
+    return $data;
+}
+
+function initJapiErrData($app, $type=array()) {
+    //$slink = $app->config['apiurl'].$app->request->get('_url');
+    $data = (object)array();
+    $data->jsonapi = array('version' => '1.0');
+    $data->error[] = array(
+        'status' => @$type[0],
+        'source' => (object)array(
+                        'pointer' => $app->request->get('_url'),
+                        //"parameter" => "include",
+                    ),
+        'title' => @$type[1],
+        'detail' => @$type[2]
+    );
+    return $data;
+}
+
+function resetPage($app) {
+    $app->myapi->reqPage = 1;
+    $app->myapi->offset = 0;
+    $app->myapi->pgPrev = 1;
+    $app->myapi->pgNext = 2;
+}
+
+function setPage($page, $tnum, $app) {
+    # use Packages count and figure out paginations
+    $page = (int)$page;
+    $limit = $app->myapi->pglimit;
+    $tpgs = floor($tnum/$limit);
+    $mod = $tnum%$limit;
+    if($mod > 0) $tpgs = $tpgs+1;
+    if($page > $tpgs) { $app->handle('/404'); exit; }
+
+    $multiplier = ($page <= 1) ? 0 : $page-1;
+    $app->myapi->offset = $multiplier * $app->myapi->pglimit;
+    $app->myapi->pgNext = ($page+1 > $tpgs) ? $page : $page+1;
+    $app->myapi->pgPrev = ($page-1 <= 0) ? 1 : $page-1;
+    $app->myapi->pgTotal = $tpgs;
+}
+
+function setPageLinks($uriPart, $tnum, $data, $app) {
+
+    if( (int)$app->myapi->reqPage <= 1 ) {
+      resetPage($app); 
+    }
+    setPage($app->myapi->reqPage, $tnum, $app);
+
+    $data->meta = array(
+        'total-pages' => $app->myapi->pgTotal,
+        'per-page' => $app->myapi->pglimit,
+        'count' => $tnum
+    );
+
+    $_reqUrl = cleanUri($app->request->get('_url'));
+    //$app->myapi->_reqUrl = $_reqUrl;
+
+    if( isset($app->myapi->offset) ) {
+      $slink = preg_replace('#\/'.$uriPart.'.*$#', '', $_reqUrl);
+      //$next = $app->myapi->pgNext;
+      //$app->myapi->_reqUrl = $slink;
+    } else {
+      $slink = $_reqUrl;
+    }
+    $slink = $app->config['apiurl'] . $slink;
+
+    $data->links = (object)array();
+    $data->links->self = $app->config['apiurl'] . $_reqUrl;
+    $data->links->next = $slink."/$uriPart/".$app->myapi->pgNext;
+    $data->links->last = $slink."/$uriPart/".$app->myapi->pgTotal;
+    $data->links->first = $slink."/$uriPart/1";
+}
+
 function fmtMaintainer($d) {
     return $d['name'].' <'.$d['email'].'>';
 }
@@ -557,34 +595,6 @@ function populate_maintainer($data, $app) { # move to model # TODO
             $d->attributes->maintainer = fmtMaintainer($m[$n]);
         }
     }
-    return $data;
-}
-
-function initJapiData($app, $type='') {
-    $data = (object)array();
-    # misc top level json api objects (non standards)
-    $data->jsonapi = array('version' => '1.0');
-    $data->meta = (object)array();
-
-    $_reqUrl = cleanUri($app->request->get('_url'));
-    $data->links = (object)array();
-    $data->links->self = $app->config['apiurl'] . $_reqUrl;
-    return $data;
-}
-
-function initJapiErrData($app, $type=array()) {
-    //$slink = $app->config['apiurl'].$app->request->get('_url');
-    $data = (object)array();
-    $data->jsonapi = array('version' => '1.0');
-    $data->error[] = array(
-        'status' => @$type[0],
-        'source' => (object)array(
-                        'pointer' => $app->request->get('_url'),
-                        //"parameter" => "include",
-                    ),
-        'title' => @$type[1],
-        'detail' => @$type[2]
-    );
     return $data;
 }
 
