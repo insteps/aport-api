@@ -236,7 +236,7 @@ $app->get('/packages/{id:[0-9]+}/relationships/{type}', function($id, $type) use
     $subtype = 'pid';
 
     if($type === 'flagged') {
-        $res = Packages::findFirst( array( "id = '$id'", 'limit' => 1) );
+        $res = Packages::findFirst( array( "id = '$id'", 'limit' => 1 ) );
         $id = $res->fid;
     }
 
@@ -272,7 +272,9 @@ $app->get('/packages/fid/{fid:[0-9]+}', function($fid) use ($app) {
 
 
 $app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
-    return $app->handle("/packages/pid/$pid");
+    $res = Packages::findFirst( array( "id = '$pid'", 'limit' => 1 ) );
+    $origin = $res->origin;
+    return $app->handle("/packages/name/$origin");
 });
 
 
