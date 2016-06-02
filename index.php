@@ -335,6 +335,12 @@ $app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function($fid, $type) us
     $app->handle('/404');
 });
 
+// Seems depends would only have a relationship with packages
+// this route can be directed to below route
+$app->get('/depends/{name:[a-z]+.*}', function($name) use ($app) {
+    $app->handle("/depends/$name/relationships/packages");
+});
+
 
 $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}',
     function($rel, $pid) use ($app) {
@@ -382,11 +388,6 @@ $app->get('/contents/{id:[0-9]+}/relationships/{type}', function($id, $type) use
     $app->handle('/404');
 });
 
-// Seems depends would only have a relationship with packages
-// this route can be directed to below route
-$app->get('/depends/{name:[a-z]+.*}', function($name) use ($app) {
-    $app->handle("/depends/$name/relationships/packages");
-});
 
 // Retrieves package data by its depends(name) relationships (funny relationships)
 //  possibly taken as packages that depends on this given named pkg # TODO
