@@ -231,10 +231,11 @@ $app->get('/packages/page', function() use ($app) {
 
 // Retrieves packages by paginations
 $app->get('/packages/page/{page:[0-9]+}', function($page) use ($app) {
-    $page = (int)$page;
 
-    $limit = $app->myapi->pglimit;
     $res = Packages::find();
+
+    $page = (int)$page;
+    $limit = $app->myapi->pglimit;
     $tnum = count($res);
     $tpgs = floor($tnum/$limit);
     $mod = $tnum%$limit;
@@ -245,6 +246,7 @@ $app->get('/packages/page/{page:[0-9]+}', function($page) use ($app) {
     $app->myapi->offset = $multiplier * $app->myapi->pglimit;
     $app->myapi->pgNext = ($page+1 > $tpgs) ? $page : $page+1;
     $app->myapi->pgPrev = ($page-1 <= 0) ? 1 : $page-1;
+
     $app->handle("/packages");
 });
 
@@ -270,6 +272,8 @@ $app->get('/packages/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
 
 // Retrieves packages by id
 // would override /packages/{name} if name is all digits
+// but should pick single pkg with that ID.
+// we are not expecting any pgk <names> with digits only, are we ?
 $app->get('/packages/{pid:[0-9]+}', function($pid) use ($app) {
     return $app->handle("/packages/pid/$pid");
 });
@@ -314,8 +318,40 @@ $app->get('/packages/fid/{fid:[0-9]+}', function($fid) use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
+
 $app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
     return $app->handle("/packages/pid/$pid");
+});
+
+
+$app->get('/flagged', function() use ($app) {
+    $data = initJapiData($app, 'flagged');
+
+    $limit = 50; $offset = 0;
+
+    $res = Flagged::find(
+        array(
+            "order" => "created DESC",
+            "limit" => $limit,
+            "offset" => "$offset"
+        )
+    );
+    $data->data = fmtData($res, 'flagged.', $app)->data;
+
+    if($data) json_api_encode($data, $app);
+
+});
+
+// Retrieves flagged by paginations (defaults)
+$app->get('/flagged/page', function($page) use ($app) {
+    $app->myapi->offset = 0;
+    $app->myapi->pgPrev = 1;
+    $app->myapi->pgNext = 2;
+    $app->handle("/flagged");
+});
+
+// Retrieves flagged by paginations
+$app->get('/flagged/page/{page:[0-9]+}', function($page) use ($app) {
 });
 
 $app->get('/flagged/fid/{fid:[0-9]+}', function($fid) use ($app) {
@@ -476,6 +512,9 @@ function isJapiReqHeader($app) { # TODO
     // Get 'Content-Type:' header
     // ---------------------------
     $_h_ctype = $app->request->getHeader('content-type');
+
+    // No need to process httpd server's extra headers for now
+    // eg. 'HTTP_CONTENT_TYPE' set by nginx
 
     return $_h_ctype;
     if ($_h_accept == "application/vnd.api+json") {
