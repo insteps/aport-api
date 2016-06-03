@@ -707,6 +707,7 @@ function fmtData($res, $type, $app) {
         }
         // some cleaning
         $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
+        unset($obj->links); // need more rationale # TODO
         $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
 
         # make relationships objects links
