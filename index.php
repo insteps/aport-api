@@ -16,7 +16,6 @@ use Phalcon\Events\Manager as EventsManager;
 use Phalcon\Di\FactoryDefault;
 use Phalcon\Db\Adapter\Pdo\Mysql as PdoMysql;
 use Phalcon\Db\Adapter\Pdo\Sqlite as PdoSqlite;
-$url = new Url();
 
 // Application configuration data
 // -------------------------------
@@ -26,9 +25,7 @@ $config['version'] = '0.0.1';
 # cPhalcon use '_url=' to pass request, 
 #  eg. http://localhost/aport-api/?_url=
 # use this if .htaccess or url rewrite is unavailable.
-$url->setBaseUri('http://localhost/aport-api');
-
-$config['apiurl'] = $url->getBaseUri();
+$config['baseUri'] = 'http://localhost/aport-api';
 
 // for mysql
 $config['mysql'] = array(
@@ -48,6 +45,10 @@ $config['dbtype'] = 'sqlite';
 
 # default items per page
 $config['app']['pglimit'] = 50;
+
+$url = new Url();
+$url->setBaseUri($config['baseUri']);
+$config['apiurl'] = $url->getBaseUri();
 // -------------------------------
 
 // Use Loader() to autoload our model
@@ -424,6 +425,34 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function($name, $type
 });
 
 
+// Retrieves maintainer's names
+$app->get('/maintainer/names', function() use ($app) {
+    $data = initJapiData($app, 'maintainer');
+
+    # get Packages count
+    $res = Maintainer::find();
+    $tnum = count($res);
+    setPageLinks('page', $tnum, $data, $app);
+
+    $res = Maintainer::find(
+        array(
+            'columns' => 'id, name',
+            "order" => "name ASC",
+            "limit" => $app->myapi->pglimit,
+            "offset" => $app->myapi->offset
+        )
+    );
+
+    $data->data = fmtData($res, 'maintainer.names', $app)->data;
+    if($data) json_api_encode($data, $app);
+});
+
+// Retrieves maintainer's names
+$app->get('/maintainer/names/page/{page:[0-9]+}', function($page) use ($app) {
+    $app->myapi->reqPage = (int)$page;
+    $app->handle("/maintainer/names");
+});
+
 # Error Handling / Responses
 # --------------------------
 
@@ -434,12 +463,24 @@ $app->error(
     }
 );
 
+# Accepted
+$app->get('/202', function() use ($app) {
+});
+
+# No Content
+$app->get('/204', function() use ($app) {
+});
+
 # Error Response 401
 $app->get('/401', function() use ($app) {
     $app->response->setStatusCode(401, "Unauthorized")->sendHeaders();
     $data = initJapiErrData($app, 
       array( '401', 'Access is not authorized', '' ));
     json_api_encode($data, $app);
+});
+
+# Forbidden
+$app->get('/403', function() use ($app) {
 });
 
 # Error Response 404
@@ -474,7 +515,7 @@ $app->get('/say/welcome/{name}', function($name) {
 
 /*
  Utility functions
- -----------------
+ --------------------------
 */
 
 function isJapiReqHeader($app) { # TODO
@@ -621,11 +662,13 @@ function populate_maintainer($data, $app) { # move to model # TODO
 }
 
 # TO CLEAN ( repeating codes ), use model if better
+# hard code $list just to remove pid field # TODO
 function fmtData($res, $type, $app) {
     if ( ! $res ) { $app->handle('/404'); }
 
     list($type, $subtype) = explode('.', $type);
     $jsonApi = (object)array();
+    $relationships = array();
 
     if($type === 'flagged') {
         $dindentifier = 'fid';
@@ -635,7 +678,7 @@ function fmtData($res, $type, $app) {
 
     if($type === 'install_if') {
         $dindentifier = 'pid';
-        $list = array( "name", "version", "operator" );  # hard code list just to remove pid field # TODO
+        $list = array( "name", "version", "operator" );
         $relationships = array("packages");
     }
 
@@ -669,6 +712,16 @@ function fmtData($res, $type, $app) {
                                  "origins", "contents", "flagged" );
     }
 
+    if($type === 'maintainer') {
+        $dindentifier = 'id';
+        if( $subtype === 'names' ) {
+            $list = array( "name" );
+        } else {
+            $list = array( "name", "email" );
+            $relationships = array("packages");
+        }
+    }
+
     $slink = '/' . $type . '/';
 
     foreach ($res as $item) {
@@ -681,9 +734,6 @@ function fmtData($res, $type, $app) {
             $newitem[$l] = $item->$l;
         }
         $obj->attributes = (object)$newitem;
-        if( $subtype === 'pid' ) {
-        } else {
-        }
 
         # see http://jsonapi.org/format/#document-top-level if still an issue
         //$jsonApi->data = $obj; # primary data in a single resource identifier object
@@ -710,11 +760,13 @@ function fmtData($res, $type, $app) {
         unset($obj->links); // need more rationale # TODO
         $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
 
-        # make relationships objects links
-        foreach($relationships as $val) {
-            $rels[$val]['links']['self'] = $rlink.$val;
+        if(count($relationships) >= 1) {
+            # make relationships objects links
+            foreach($relationships as $val) {
+                $rels[$val]['links']['self'] = $rlink.$val;
+            }
+            $obj->relationships = (object)$rels;
         }
-        $obj->relationships = (object)$rels;
     }
     return $jsonApi;
 
@@ -730,6 +782,7 @@ function json_api_encode($data, $app, $flags=array()) {
     echo json_encode($data);
 }
 
+// --------------------------
 # removes php version numbers, 
 # considered as probable security issue
 header_remove('X-Powered-By');
