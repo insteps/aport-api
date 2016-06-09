@@ -188,7 +188,7 @@ $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters)
            );
 
     if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
-    print_r($filter); exit;
+    //print_r($filter); exit;
 
     $res = Packages::find( $params );
     # get Packages count
