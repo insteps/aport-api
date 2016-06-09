@@ -170,22 +170,20 @@ The Aports API consists of the following methods: # TODO - clean text import fro
 
 
 /*
-  Filters are split into key/value pairs, order/presence in uri are optional,
+  Search filters are split into key/value pairs, order/presence in uri are optional,
   following keys/values are recogonized
   1. category/branch:repo:arch eg. category/v3.4:main:x86 ('all' keyword for any)
      defaults to category/edge:main:x86
   2. name/<pkgname> ( wildcard recogonized '*' )
-  3. maintainer/<maintainerName[*]>
-  4. flagged/[yes|no]
+  3. maintainer/<maintainerName[*]> # TODO
+  4. flagged/[yes|no] # TODO
 */
 $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters) use ($app) {
     $data = initJapiData($app, 'search');
     $filter = (array)sanitize_filters($filters, $where, $app);
 
     $conditions = implode(' AND ', $filter['filter2']);
-    $params = array(
-            "conditions" => "$conditions",
-           );
+    $params = array( 'conditions' => "$conditions" );
 
     if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
     //print_r($filter); exit;
@@ -207,7 +205,7 @@ $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters)
     $data = populate_maintainer($data, $app);
 
     if($data) json_api_encode($data, $app);
-//    echo "searching... $filters \n";
+
 });
 
 // Sanitizes and makes filters into key=>value array
@@ -217,7 +215,7 @@ function sanitize_filters($filters='', $where='', $app) {
     if ( ! in_array($where, $_w)) return;
     $f = explode('/', single_slash(urldecode($filters)));
     for($c=0; $c<=count($f); $c=$c+2) {
-        # limit to 28 chars
+        # limit to 56 chars
         if($f[$c]) $filter[$f[$c]] = mb_substr(@$f[$c+1], 0, 56);
     }
     $filter['filter'] = array();
@@ -251,8 +249,8 @@ function set_search_name($f) {
     if( ! array_key_exists('name', $f) ) return $f;
     $name = preg_replace('#[^a-z0-9\-\_\.]#', '', $f['name']);
     $len = strlen($f['name']);
-    $l1 = $f['name']{0} === '*' ? '%' : '';
-    $l2 = $f['name']{$len-1} === '*' ? '%' : '';
+    $l1 = $f['name']{0} === '_' ? '%' : '';
+    $l2 = $f['name']{$len-1} === '_' ? '%' : '';
     $op = ($l1 === '%' || $l2 === '%') ? 'LIKE' : '=';
     $f['filter2'][] = "name $op '$l1$name$l2'";
     $f['filter']['name'] = $l1.$name.$l2;
@@ -467,14 +465,15 @@ $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}'
     $res = $_r[1]::find();
     $tnum = count($res);
 
-    $data->meta = array(
-        'total-files' => $tnum
-    );
     # data
     $res = $_r[1]::find( array( "$subtype = '$pid'") );
     $tnum2 = count($res);
     if( ! $tnum2 > 0) return $app->handle('/404');
+
+    //setPageLinks('page', $tnum2, $data, $app);
+    $data->meta['total-files'] = $tnum;
     $data->meta['pkg-count'] = $tnum2;
+
     $data->data = fmtData($res, $_r[2], $app)->data;
     return json_api_encode($data, $app);
 });
@@ -661,7 +660,7 @@ function initJapiData($app, $type='') {
     $data = (object)array();
     # misc top level json api objects (non standards)
     $data->jsonapi = array('version' => '1.0');
-    $data->meta = (object)array();
+    $data->meta = array();
 
     $_reqUrl = cleanUri($app->request->get('_url'));
     $data->links = (object)array();
