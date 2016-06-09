@@ -270,6 +270,13 @@ function set_search_flagged($f) { # TODO
     return $f;
 }
 
+// Retrieves all categories
+$app->get('/categories', function() use ($app) {
+    $data = initJapiData($app, 'categories'); #maynot comply jsonapi spec
+    $data->data = get_all_category();
+    if($data) json_api_encode($data, $app);
+});
+
 // Retrieves packages
 $app->get('/packages', function() use ($app) {
 
@@ -686,7 +693,7 @@ function get_all_category() {
     foreach($res as $m1) {
         foreach($t as $t1) { $m[$t1][] = $m1->$t1; }
     }
-    foreach($t as $t1) { $cats[$t1] = array_unique($m[$t1]); }
+    foreach($t as $t1) { $cats[$t1] = array_values(array_unique($m[$t1])); }
     unset($m, $m1, $res);
     return $cats;
 }
