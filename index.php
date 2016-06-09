@@ -168,6 +168,108 @@ The Aports API consists of the following methods: # TODO - clean text import fro
 
 */
 
+
+/*
+  Filters are split into key/value pairs, order/presence in uri are optional,
+  following keys/values are recogonized
+  1. category/branch:repo:arch eg. category/v3.4:main:x86 ('all' keyword for any)
+     defaults to category/edge:main:x86
+  2. name/<pkgname> ( wildcard recogonized '*' )
+  3. maintainer/<maintainerName[*]>
+  4. flagged/[yes|no]
+*/
+$app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters) use ($app) {
+    $data = initJapiData($app, 'search');
+    $filter = (array)sanitize_filters($filters, $where, $app);
+
+    $conditions = implode(' AND ', $filter['filter2']);
+    $params = array(
+            "conditions" => "$conditions",
+           );
+
+    if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
+    print_r($filter); exit;
+
+    $res = Packages::find( $params );
+    # get Packages count
+    $tnum = count($res);
+    setPageLinks('page', $tnum, $data, $app);
+
+    $params = array(
+            "conditions" => "$conditions",
+            "order" => "id DESC",
+            "limit" => $app->myapi->pglimit,
+            "offset" => $app->myapi->offset
+           );
+    $res = Packages::find( $params );
+
+    $data->data = fmtData($res, 'packages.', $app)->data;
+    $data = populate_maintainer($data, $app);
+
+    if($data) json_api_encode($data, $app);
+//    echo "searching... $filters \n";
+});
+
+// Sanitizes and makes filters into key=>value array
+function sanitize_filters($filters='', $where='', $app) {
+    $_w = array('packages', 'contents');
+    $_k = array('category', 'name', 'maintainer', 'flagged');
+    if ( ! in_array($where, $_w)) return;
+    $f = explode('/', single_slash(urldecode($filters)));
+    for($c=0; $c<=count($f); $c=$c+2) {
+        # limit to 28 chars
+        if($f[$c]) $filter[$f[$c]] = mb_substr(@$f[$c+1], 0, 56);
+    }
+    $filter['filter'] = array();
+    # Create customs filters # TODO
+    $filter = set_search_category($filter);
+    $filter = set_search_name($filter);
+    $filter = set_search_maint($filter);
+    $filter = set_search_flagged($filter);
+    return $filter;
+}
+
+function set_search_category($f) {
+    $t = array('branch', 'repo', 'arch');
+    $tdef = array('edge', 'main', 'x86_64'); #defaults
+    if( ! array_key_exists('category', $f) ) return $f;
+    $f['category'] = preg_replace('#[^\w\d\:\_\-\.]#', '', $f['category']);
+
+    $f['all_category'] = get_all_category();
+    $cat = explode(':', $f['category']);
+    foreach($t as $t0=>$t1) {
+       if($cat[$t0] === 'all') continue; 
+       $cat2[$t1] = in_array($cat[$t0], $f['all_category'][$t1]) ? $cat[$t0] : $tdef[$t0];
+    }
+    foreach($cat2 as $t0=>$t1) {
+        $f['filter2'][] = "$t0 = '$t1'";
+    }
+    $f['filter'] = $cat2;
+    return $f;
+}
+function set_search_name($f) {
+    if( ! array_key_exists('name', $f) ) return $f;
+    $name = preg_replace('#[^a-z0-9\-\_\.]#', '', $f['name']);
+    $len = strlen($f['name']);
+    $l1 = $f['name']{0} === '*' ? '%' : '';
+    $l2 = $f['name']{$len-1} === '*' ? '%' : '';
+    $op = ($l1 === '%' || $l2 === '%') ? 'LIKE' : '=';
+    $f['filter2'][] = "name $op '$l1$name$l2'";
+    $f['filter']['name'] = $l1.$name.$l2;
+    return $f;
+}
+function set_search_maint($f) { # TODO
+    if( ! array_key_exists('maint', $f) ) return $f;
+    return $f;
+}
+function set_search_flagged($f) { # TODO
+    if( ! array_key_exists('flagged', $f) ) return $f;
+    $tdef = array('yes', 'no', ''); #defaults
+    $flagged = in_array($f['flagged'], $tdef) ? $f['flagged'] : '';
+    //$f['filter2'][] =  "flagged = '$flagged'";
+    return $f;
+}
+
 // Retrieves packages
 $app->get('/packages', function() use ($app) {
 
@@ -576,6 +678,19 @@ function initJapiErrData($app, $type=array()) {
     return $data;
 }
 
+function get_all_category() {
+    $t = array('branch', 'repo', 'arch');
+    $cats = array();
+    # get all Repoversions available
+    $res = Repoversion::find();
+    foreach($res as $m1) {
+        foreach($t as $t1) { $m[$t1][] = $m1->$t1; }
+    }
+    foreach($t as $t1) { $cats[$t1] = array_unique($m[$t1]); }
+    unset($m, $m1, $res);
+    return $cats;
+}
+
 function resetPage($app) {
     $app->myapi->reqPage = 1;
     $app->myapi->offset = 0;
@@ -633,6 +748,10 @@ function setPageLinks($uriPart, $tnum, $data, $app) {
 
 function fmtMaintainer($d) {
     return $d['name'].' <'.$d['email'].'>';
+}
+
+function single_slash($parturi) {
+    return preg_replace('#\/{2}+#', '/', $parturi);
 }
 
 function populate_maintainer($data, $app) { # move to model # TODO
@@ -745,7 +864,6 @@ function fmtData($res, $type, $app) {
         if($type == 'contents' || $type === 'packages') {
             $obj->links->self = $slink.$item->id;
             $rlink = $slink.$item->id .'/relationships/';
-
         }
         if($type === 'install_if' || $type === 'provides' || $type === 'depends') {
             $obj->links->self = $slink.$item->name;
@@ -756,9 +874,9 @@ function fmtData($res, $type, $app) {
             $rlink = $slink.$item->fid .'/relationships/';
         }
         // some cleaning
-        $obj->links->self = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $obj->links->self);
+        $obj->links->self = $app->config['apiurl'].single_slash($obj->links->self);
         unset($obj->links); // need more rationale # TODO
-        $rlink = $app->config['apiurl'].preg_replace('#\/{2}+#', '/', $rlink);
+        $rlink = $app->config['apiurl'].single_slash($rlink);
 
         if(count($relationships) >= 1) {
             # make relationships objects links
@@ -770,7 +888,6 @@ function fmtData($res, $type, $app) {
     }
     return $jsonApi;
 
-    $app->handle('/404');
 }
 
 function json_api_encode($data, $app, $flags=array()) {
