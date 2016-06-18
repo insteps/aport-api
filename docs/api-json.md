@@ -34,7 +34,8 @@ searching
 -----------
 * Searching packages by categories
 api uri: `<BaseURL>/search/packages/category/<branch>:<repo>:<arch>/name/<pkgName>`
-* Wildcard recogonized '_'
+* Reserved keyword in categories - ''all''
+* Wildcard for package name recogonized '_'
 
 Eg. Basic search
 `curl https://api.alpinelinux.org/search/packages/category/v3.4:all:x86/name/_bas_ | jq . | less`
@@ -53,15 +54,15 @@ Eg. Get available categories
 
 flagged packages
 -----------------
-See the current package that got flagged
+* See the current package that got flagged
 `new=$(curl api.alpinelinux.org/aport-api/flagged/new | jq .data[].relationships.packages.links.self | sed -e 's/"//g'); curl $new | jq .data[].attributes.origin | uniq`
 
 
 maintainers
 ------------
-Get first page
+* Get first page
 `<BaseURL>/maintainer/names`
-Get other pages
+* Get other pages
 `<BaseURL>/maintainer/names/page/<num>`
 
 
