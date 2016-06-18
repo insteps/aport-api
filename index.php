@@ -792,32 +792,27 @@ function fmtData($res, $type, $app) {
 
     list($type, $subtype) = explode('.', $type);
     $jsonApi = (object)array();
-    $rels = array();
+    $rels = array("packages");
 
     if($type === 'flagged') {
-        $idf = 'fid'; // indentifier
-        $rels = array("packages");
+        $idf = 'fid'; // identifier
     }
 
     if($type === 'install_if') {
         $idf = 'pid';
-        $rels = array("packages");
     }
 
     if($type === 'provides') {
         $idf = 'pid';
-        $rels = array("packages");
         //$slink = '/' . 'files' . '/'; # TODO
     }
 
     if($type === 'depends') {
         $idf = 'pid';
-        $rels = array("packages");
     }
 
     if($type === 'contents') { # from table 'files'
         $idf = 'id';
-        $rels = array("packages");
     }
 
     if($type === 'packages') {
@@ -828,10 +823,7 @@ function fmtData($res, $type, $app) {
 
     if($type === 'maintainer') {
         $idf = 'id';
-        if( $subtype === 'names' ) {
-        } else {
-            $rels = array("packages");
-        }
+        $rels = array();
     }
 
     $slink = '/' . $type . '/';
@@ -876,9 +868,9 @@ function fmtData($res, $type, $app) {
         if(count($rels) >= 1) {
             # make relationships objects links
             foreach($rels as $val) {
-                $rels[$val]['links']['self'] = $rlink.$val;
+                $_rels[$val]['links']['self'] = $rlink.$val;
             }
-            $obj->relationships = (object)$rels;
+            $obj->relationships = (object)$_rels;
         }
     }
     return $jsonApi;
