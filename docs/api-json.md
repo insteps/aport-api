@@ -54,6 +54,9 @@ Eg. Get available categories
 
 flagged packages
 -----------------
+* Get flagged data (paginated) `<BaseURL>/flagged` (follow relationships link to get package data)
+** `<BaseURL>/flagged/page/<num>` - more items (older)
+* Get current flagged item `<BaseURL>/flagged/new`
 * See the current package that got flagged
 `new=$(curl api.alpinelinux.org/aport-api/flagged/new | jq .data[].relationships.packages.links.self | sed -e 's/"//g'); curl $new | jq .data[].attributes.origin | uniq`
 
