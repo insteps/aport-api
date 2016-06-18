@@ -174,8 +174,8 @@ The Aports API consists of the following methods: # TODO - clean text import fro
   following keys/values are recogonized
   1. category/branch:repo:arch eg. category/v3.4:main:x86 ('all' keyword for any)
      defaults to category/edge:main:x86
-  2. name/<pkgname> ( wildcard recogonized '*' )
-  3. maintainer/<maintainerName[*]> # TODO
+  2. name/<pkgname> ( wildcard recogonized '_' )
+  3. maintainer/<maintainerName>  ( wildcard recogonized '_' ) # TODO
   4. flagged/[yes|no] # TODO
 */
 $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters) use ($app) {
@@ -787,63 +787,50 @@ function populate_maintainer($data, $app) { # move to model # TODO
 }
 
 # TO CLEAN ( repeating codes ), use model if better
-# hard code $list just to remove pid field # TODO
 function fmtData($res, $type, $app) {
     if ( ! $res ) { $app->handle('/404'); }
 
     list($type, $subtype) = explode('.', $type);
     $jsonApi = (object)array();
-    $relationships = array();
+    $rels = array();
 
     if($type === 'flagged') {
-        $dindentifier = 'fid';
-        $list = array( "created", "reporter", "new_version", "message" );
-        $relationships = array("packages");
+        $idf = 'fid'; // indentifier
+        $rels = array("packages");
     }
 
     if($type === 'install_if') {
-        $dindentifier = 'pid';
-        $list = array( "name", "version", "operator" );
-        $relationships = array("packages");
+        $idf = 'pid';
+        $rels = array("packages");
     }
 
     if($type === 'provides') {
-        $dindentifier = 'pid';
-        $list = array( "name", "version", "operator" );
-        $relationships = array("packages");
+        $idf = 'pid';
+        $rels = array("packages");
         //$slink = '/' . 'files' . '/'; # TODO
     }
 
     if($type === 'depends') {
-        $dindentifier = 'pid';
-        $list = array( "name", "version", "operator" );
-        $relationships = array("packages");
+        $idf = 'pid';
+        $rels = array("packages");
     }
 
     if($type === 'contents') { # from table 'files'
-        $dindentifier = 'id';
-        $list = array( "file", "path" );
-        $relationships = array("packages");
+        $idf = 'id';
+        $rels = array("packages");
     }
 
     if($type === 'packages') {
-        $dindentifier = 'id';
-        $list = array( # hard code list just to remove id field # TODO
-             "license", "arch", "build_time", "maintainer", "checksum",
-             "version", "installed_size", "branch", "size", "commit",
-             "origin", "url", "repo", "name", "description", "fid"
-        );
-        $relationships = array( "depends", "provides", "install_if",
+        $idf = 'id';
+        $rels = array( "depends", "provides", "install_if",
                                  "origins", "contents", "flagged" );
     }
 
     if($type === 'maintainer') {
-        $dindentifier = 'id';
+        $idf = 'id';
         if( $subtype === 'names' ) {
-            $list = array( "name" );
         } else {
-            $list = array( "name", "email" );
-            $relationships = array("packages");
+            $rels = array("packages");
         }
     }
 
@@ -852,13 +839,10 @@ function fmtData($res, $type, $app) {
     foreach ($res as $item) {
         $obj = (object)array();
         $obj->type = $type;
-        $obj->id = $item->$dindentifier;
+        $obj->id = $item->$idf;
         $obj->links = new stdClass;
 
-        foreach($list as $l) {
-            $newitem[$l] = $item->$l;
-        }
-        $obj->attributes = (object)$newitem;
+        $obj->attributes = (object)$item;
 
         # see http://jsonapi.org/format/#document-top-level if still an issue
         //$jsonApi->data = $obj; # primary data in a single resource identifier object
@@ -869,24 +853,29 @@ function fmtData($res, $type, $app) {
 
         if($type == 'contents' || $type === 'packages') {
             $obj->links->self = $slink.$item->id;
-            $rlink = $slink.$item->id .'/relationships/';
+            $rlink = $slink.$item->id;
         }
         if($type === 'install_if' || $type === 'provides' || $type === 'depends') {
             $obj->links->self = $slink.$item->name;
-            $rlink = $slink.$item->name .'/relationships/';
+            $rlink = $slink.$item->name;
+        }
+        if($type === 'depends') {
+            $obj->links->self = '/packages/'.$item->name;
+            $rlink = $slink.$item->name;
         }
         if($type === 'flagged') {
             $obj->links->self = $slink.$item->fid;
-            $rlink = $slink.$item->fid .'/relationships/';
+            $rlink = $slink.$item->fid;
         }
         // some cleaning
         $obj->links->self = $app->config['apiurl'].single_slash($obj->links->self);
         unset($obj->links); // need more rationale # TODO
-        $rlink = $app->config['apiurl'].single_slash($rlink);
+        $rlink = $app->config['apiurl'].single_slash($rlink.'/relationships/');
+        unset($item->$idf);
 
-        if(count($relationships) >= 1) {
+        if(count($rels) >= 1) {
             # make relationships objects links
-            foreach($relationships as $val) {
+            foreach($rels as $val) {
                 $rels[$val]['links']['self'] = $rlink.$val;
             }
             $obj->relationships = (object)$rels;
