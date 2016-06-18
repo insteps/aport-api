@@ -6,9 +6,9 @@ EXAMPLES
 CURL usage:
 ===========
 Dependencies:
-1. curl
-2. jq
-3. less
+# curl
+# jq
+# less
 
 Note: jq is json commandline parser and tools for JSON.
 Site: `http://stedolan.github.io/jq/`
@@ -16,6 +16,10 @@ Site: `http://stedolan.github.io/jq/`
 Get packages list (paginated 50 items)
 ----------------------------------------
 `curl https://api.alpinelinux.org/packages | jq . | less`
+
+Basic search
+-----------------------------------------
+`curl https://api.alpinelinux.org/search/packages/category/v3.4:all:x86/name/_bas_ | jq . | less`
 
 Get the current package that got flagged
 -----------------------------------------
@@ -26,6 +30,7 @@ Get list of maintainer names
 `curl https://api.alpinelinux.org/maintainer/names | jq . | less`
 
 Get available categories
+-----------------------------------------
 `curl https://api.alpinelinux.org/categories | jq . | less`
 
 
