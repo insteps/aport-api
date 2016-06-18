@@ -7,6 +7,18 @@ Api is build around packages data and its relationships with other tables in dat
 using, simple one-to-one relationships.
 Currently, complex JOINS in database is being avoided and maybe used if needed.
 
+
+Relationships
+==============
+Following relationships exists, emanating from a base package<name>
+* origin (original package to which the ''subpackage/named package'' belongs to)
+* install_if 
+* provides (what the package provides)
+* depends (what the named package depends on)
+* contents (contents of the package)
+* flagged (if package is flagged, relationship to its data)
+
+
 Base URL
 -----------
 https://api.alpinelinux.org/
@@ -17,17 +29,6 @@ api uri: `<BaseURL>/packages/...`
 
 Get packages list (paginated 50 items)
 `curl https://api.alpinelinux.org/packages | jq . | less`
-
-
-RELATIONSHIPS
-==============
-Following relationships exists, emanating from a base package<name>
-* origin (original package to which the ''subpackage/named package'' belongs to)
-* install_if 
-* provides (what the package provides)
-* depends (what the named package depends on)
-* contents (contents of the package)
-* flagged (if package is flagged, relationship to its data)
 
 
 searching
@@ -55,7 +56,7 @@ Eg. Get available categories
 flagged packages
 -----------------
 * Get flagged data (paginated) `<BaseURL>/flagged` (follow relationships link to get package data)
-** `<BaseURL>/flagged/page/<num>` - more items (older)
+* `<BaseURL>/flagged/page/<num>` - more items (older)
 * Get current flagged item `<BaseURL>/flagged/new`
 * See the current package that got flagged
 `new=$(curl api.alpinelinux.org/aport-api/flagged/new | jq .data[].relationships.packages.links.self | sed -e 's/"//g'); curl $new | jq .data[].attributes.origin | uniq`
