@@ -6,9 +6,9 @@ EXAMPLES
 CURL usage:
 ===========
 Dependencies:
-# curl
-# jq
-# less
+* curl
+* jq
+* less
 
 Note: jq is json commandline parser and tools for JSON.
 Site: `http://stedolan.github.io/jq/`
