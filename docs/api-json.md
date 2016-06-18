@@ -22,12 +22,22 @@ Get packages list (paginated 50 items)
 RELATIONSHIPS
 ==============
 Following relationships exists, emanating from a base package<name>
-# origin (original package to which the ''subpackage/named package'' belongs to)
-# install_if 
-# provides (what the package provides)
-# depends (what the named package depends on)
-# contents (contents of the package)
-# flagged (if package is flagged, relationship to its data)
+* origin (original package to which the ''subpackage/named package'' belongs to)
+* install_if 
+* provides (what the package provides)
+* depends (what the named package depends on)
+* contents (contents of the package)
+* flagged (if package is flagged, relationship to its data)
+
+
+searching
+-----------
+* Searching packages by categories
+api uri: `<BaseURL>/search/packages/category/<branch>:<repo>:<arch>/name/<pkgName>`
+* Wildcard recogonized '_'
+
+Eg. Basic search
+`curl https://api.alpinelinux.org/search/packages/category/v3.4:all:x86/name/_bas_ | jq . | less`
 
 
 categories
