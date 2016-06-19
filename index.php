@@ -214,6 +214,7 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where, $filters) use ($app) 
     # Create customs filters # TODO
     $filter = set_search_category($filter);
     $filter = set_search_flagged($filter);
+    $filter = set_search_maint($filter);
     //print_r($filter); exit;
 
     if('packages' === $where) {
@@ -240,7 +241,7 @@ $app->post('/search/{where:[a-z0-9\_]+}/page/{page:[0-9]+}', function($where, $p
 // Sanitizes and makes filters into key=>value array
 function sanitize_filters($filters='', $where='', $app) {
     $_w = array('packages', 'contents');
-    $_k = array('category', 'name', 'maintainer', 'flagged');
+    //$_k = array('category', 'name', 'maintainer', 'flagged');
     if ( ! in_array($where, $_w)) return;
 
     $f = explode('/', single_slash(urldecode($filters)));
@@ -253,7 +254,6 @@ function sanitize_filters($filters='', $where='', $app) {
     # Create customs filters # TODO
     $filter = set_search_category($filter);
     $filter = set_search_name_pkg($filter);
-    //$filter = set_search_maint($filter);
     $filter = set_search_flagged($filter);
     return $filter;
 }
@@ -290,8 +290,26 @@ function set_search_name_pkg($f) {
     $name = preg_replace('#[^a-z0-9\-\_\.]#', '', $f['name']);
     return set_search_glob($f, 'name', $name);
 }
-function set_search_maint($f) { # TODO
-    if( ! array_key_exists('maint', $f) ) return $f;
+function set_search_maint($f) {
+    if( ! array_key_exists('maintainer', $f) ) return $f;
+    $name = mb_substr(@$f['maintainer'], 0, 56); # limit name to 56 chars
+    $f['filter']['maintainer'] = $name;
+    $f = set_search_glob($f, 'maintainer', $name, 0);
+    $_f = $f['filter']['maintainer'];
+
+    $condt = " name LIKE '$_f' ";
+    $params = array(
+            'conditions' => "$condt",
+            'columns' => 'id',
+            'order' => "id ASC",
+           );
+    $res = Maintainer::find( $params );
+
+    foreach($res as $d) { $a[] = $d->id; }
+    $l = trim(implode(',', array_unique($a)), ',');
+    $l = preg_replace('#\,{2}+#', ',', $l);
+    if( ! empty($l)) $f['filter2'][] = "maintainer IN ($l)";
+
     return $f;
 }
 function set_search_flagged($f) {
@@ -299,7 +317,7 @@ function set_search_flagged($f) {
     $tdef = array('yes', 'no', ''); #accepted values
     $flagged = in_array($f['flagged'], $tdef) ? $f['flagged'] : '';
     $f['filter']['flagged'] = $flagged;
-    if('yes' === $flagged) { # only need 'yes' marked in api
+    if('yes' === $flagged) { # only need 'yes' i.e flagged items for api
         $f['filter2'][] =  "fid IS NOT NULL";
     }
     return $f;
@@ -334,7 +352,7 @@ function get_package($filter=array(), $data=array(), $app) {
 
     $params = array(
             "conditions" => "$condt",
-            "order" => "id DESC",
+            "order" => "id DESC", # add other simple orderby # TODO
             "limit" => $app->myapi->pglimit,
             "offset" => $app->myapi->offset
            );
