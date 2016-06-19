@@ -23,11 +23,11 @@ Basic search (GET)
 
 Advanced search (POST)
 -----------------------------------------
-`curl -X POST https://api.alpinelinux.org/aport-api/?_url=/search/packages/page/2 -d '{"name":"_bas_","category":"edge:main:x86"}' | jq -C . | less`
+`curl -X POST https://api.alpinelinux.org/search/packages -d '{"name":"_bas_","category":"edge:main:x86"}' | jq . | less`
 
 Get the current package that got flagged
 -----------------------------------------
-`new=$(curl api.alpinelinux.org/aport-api/flagged/new | jq .data[].relationships.packages.links.self | sed -e 's/"//g'); curl $new | jq .data[].attributes.origin | uniq`
+`new=$(curl api.alpinelinux.org/flagged/new | jq .data[].relationships.packages.links.self | sed -e 's/"//g'); curl $new | jq .data[].attributes.origin | uniq`
 
 Get list of maintainer names
 -----------------------------------------

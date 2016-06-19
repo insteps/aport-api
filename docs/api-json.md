@@ -40,6 +40,8 @@ api uri: `<BaseURL>/search/packages/category/<branch>:<repo>:<arch>/name/<pkgNam
 
 Eg. Basic search
 `curl https://api.alpinelinux.org/search/packages/category/v3.4:all:x86/name/_bas_ | jq . | less`
+Eg. Advanced search
+`curl -X POST https://api.alpinelinux.org/search/packages -d '{"name":"_bas_","category":"edge:main:x86"}' | jq . | less`
 
 
 categories
@@ -59,7 +61,7 @@ flagged packages
 * `<BaseURL>/flagged/page/<num>` - more items (older)
 * Get current flagged item `<BaseURL>/flagged/new`
 * See the current package that got flagged
-`new=$(curl api.alpinelinux.org/aport-api/flagged/new | jq .data[].relationships.packages.links.self | sed -e 's/"//g'); curl $new | jq .data[].attributes.origin | uniq`
+`new=$(curl api.alpinelinux.org/flagged/new | jq .data[].relationships.packages.links.self | sed -e 's/"//g'); curl $new | jq .data[].attributes.origin | uniq`
 
 
 maintainers
