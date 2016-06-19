@@ -212,6 +212,7 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where, $filters) use ($app) 
     $filter['filter'] = array();
     # Create customs filters # TODO
     $filter = set_search_category($filter);
+    $filter = set_search_flagged($filter);
     //print_r($filter); exit;
 
     if('packages' === $where) {
@@ -290,11 +291,13 @@ function set_search_maint($f) { # TODO
     if( ! array_key_exists('maint', $f) ) return $f;
     return $f;
 }
-function set_search_flagged($f) { # TODO
+function set_search_flagged($f) {
     if( ! array_key_exists('flagged', $f) ) return $f;
-    $tdef = array('yes', 'no', ''); #defaults
+    $tdef = array('yes', 'no', ''); #accepted values
     $flagged = in_array($f['flagged'], $tdef) ? $f['flagged'] : '';
-    //$f['filter2'][] =  "flagged = '$flagged'";
+    if('yes' === $flagged) {
+        $f['filter2'][] =  "fid IS NOT NULL";
+    }
     return $f;
 }
 
