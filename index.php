@@ -182,7 +182,24 @@ The Aports API consists of the following methods: # TODO - clean text import fro
 $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters) use ($app) {
     $data = initJapiData($app, 'search');
 
-    $filter = (array)sanitize_filters($filters, $where, $app);
+    //$filter = (array)sanitize_filters($filters, $where, $app);
+    $_w = array('packages', 'contents');
+    //$_k = array('category', 'name', 'maintainer', 'flagged'); # TODO
+    if ( ! in_array($where, $_w)) return;
+
+    $f = explode('/', single_slash(urldecode($filters)));
+    for($c=0; $c<=count($f); $c=$c+2) { # limit key/value to 56 chars each
+        if($f[$c]) $filter[mb_substr(@$f[$c], 0, 56)] = mb_substr(@$f[$c+1], 0, 56);
+    }
+    unset($f);
+
+    $filter['filter'] = array();
+    # Create customs filters # TODO
+    $filter = set_search_category($filter);
+    $filter = set_search_name_pkg($filter);
+    $filter = set_search_flagged($filter);
+    $filter = set_search_maint($filter);
+
     if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
 
     if('packages' === $where) {
@@ -191,6 +208,7 @@ $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters)
 
     $data->meta['search'] = $filter['filter'];
     $data->meta['per-page'] = '<=50';
+    $data->meta['count'] = count($data->data);
     if($data) json_api_encode($data, $app);
 
 });
@@ -240,21 +258,6 @@ $app->post('/search/{where:[a-z0-9\_]+}/page/{page:[0-9]+}', function($where, $p
 
 // Sanitizes and makes filters into key=>value array
 function sanitize_filters($filters='', $where='', $app) {
-    $_w = array('packages', 'contents');
-    //$_k = array('category', 'name', 'maintainer', 'flagged');
-    if ( ! in_array($where, $_w)) return;
-
-    $f = explode('/', single_slash(urldecode($filters)));
-    for($c=0; $c<=count($f); $c=$c+2) { # limit key/value to 56 chars each
-        if($f[$c]) $filter[mb_substr(@$f[$c], 0, 56)] = mb_substr(@$f[$c+1], 0, 56);
-    }
-    unset($f);
-
-    $filter['filter'] = array();
-    # Create customs filters # TODO
-    $filter = set_search_category($filter);
-    $filter = set_search_name_pkg($filter);
-    $filter = set_search_flagged($filter);
     return $filter;
 }
 
