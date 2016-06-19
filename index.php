@@ -292,9 +292,7 @@ function set_search_name_pkg($f) {
 }
 function set_search_maint($f) {
     if( ! array_key_exists('maintainer', $f) ) return $f;
-    $name = mb_substr(@$f['maintainer'], 0, 56); # limit name to 56 chars
-    $f['filter']['maintainer'] = $name;
-    $f = set_search_glob($f, 'maintainer', $name, 0);
+    $f = set_search_glob($f, 'maintainer', $f['maintainer'], 0);
     $_f = $f['filter']['maintainer'];
 
     $condt = " name LIKE '$_f' ";
@@ -306,8 +304,7 @@ function set_search_maint($f) {
     $res = Maintainer::find( $params );
 
     foreach($res as $d) { $a[] = $d->id; }
-    $l = trim(implode(',', array_unique($a)), ',');
-    $l = preg_replace('#\,{2}+#', ',', $l);
+    $l = preg_replace('#\,{2}+#', ',', trim(implode(',', array_unique($a)), ','));
     if( ! empty($l)) $f['filter2'][] = "maintainer IN ($l)";
 
     return $f;
