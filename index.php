@@ -170,6 +170,7 @@ The Aports API consists of the following methods: # TODO - clean text import fro
 
 
 /*
+  Search by GET
   Search filters are split into key/value pairs, order/presence in uri are optional,
   following keys/values are recogonized
   1. category/branch:repo:arch eg. category/v3.4:main:x86 ('all' keyword for any)
@@ -180,32 +181,61 @@ The Aports API consists of the following methods: # TODO - clean text import fro
 */
 $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters) use ($app) {
     $data = initJapiData($app, 'search');
+
     $filter = (array)sanitize_filters($filters, $where, $app);
+    if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
 
     $conditions = implode(' AND ', $filter['filter2']);
-    $params = array( 'conditions' => "$conditions" );
 
-    if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
-    //print_r($filter); exit;
+    if('packages' === $where) {
+      $data = get_package($conditions, $data, $app);
+    }
 
-    $res = Packages::find( $params );
-    # get Packages count
-    $tnum = count($res);
-    setPageLinks('page', $tnum, $data, $app);
-
-    $params = array(
-            "conditions" => "$conditions",
-            "order" => "id DESC",
-            "limit" => $app->myapi->pglimit,
-            "offset" => $app->myapi->offset
-           );
-    $res = Packages::find( $params );
-
-    $data->data = fmtData($res, 'packages.', $app)->data;
-    $data = populate_maintainer($data, $app);
-
+    $data->meta['search'] = $filter['filter2'];
     if($data) json_api_encode($data, $app);
 
+});
+
+/*
+  Advance Search by POST (expects simple key/value pairs in post data)
+  eg. '{"name":"bas_","category":"edge:main:x86"}'
+*/
+$app->post('/search/{where:[a-z0-9\_]+}', function($where, $filters) use ($app) {
+    $data = initJapiData($app, 'search');
+
+    $filter = array();
+    #expect simple key/value pairs
+    $f = (array)$app->request->getJsonRawBody();
+    foreach($f as $k=>$v) { # limit key/value to 56 chars each
+        if($v) $filter[mb_substr($k, 0, 56)] = mb_substr($v, 0, 56);
+    }
+    unset($f);
+
+    $filter['filter'] = array();
+    # Create customs filters # TODO
+    $filter = set_search_category($filter);
+    $filter = set_search_name($filter);
+    //print_r($filter); exit;
+
+    $conditions = implode(' AND ', $filter['filter2']);
+    //$params = array( 'conditions' => "$conditions" );
+
+    if('packages' === $where) {
+      $data = get_package($conditions, $data, $app);
+    }
+
+    if('files' === $where) {
+      //$data = get_file($conditions, $data, $app); # TODO
+    }
+
+    $data->meta['search'] = $filter['filter2'];
+    if($data) json_api_encode($data, $app);
+
+});
+
+$app->post('/search/{where:[a-z0-9\_]+}/page/{page:[0-9]+}', function($where, $page) use ($app) {
+    $app->myapi->reqPage = (int)$page;
+    $app->handle("/search/$where");
 });
 
 // Sanitizes and makes filters into key=>value array
@@ -213,11 +243,13 @@ function sanitize_filters($filters='', $where='', $app) {
     $_w = array('packages', 'contents');
     $_k = array('category', 'name', 'maintainer', 'flagged');
     if ( ! in_array($where, $_w)) return;
+
     $f = explode('/', single_slash(urldecode($filters)));
-    for($c=0; $c<=count($f); $c=$c+2) {
-        # limit to 56 chars
-        if($f[$c]) $filter[$f[$c]] = mb_substr(@$f[$c+1], 0, 56);
+    for($c=0; $c<=count($f); $c=$c+2) { # limit key/value to 56 chars each
+        if($f[$c]) $filter[mb_substr(@$f[$c], 0, 56)] = mb_substr(@$f[$c+1], 0, 56);
     }
+    unset($f);
+
     $filter['filter'] = array();
     # Create customs filters # TODO
     $filter = set_search_category($filter);
@@ -280,25 +312,32 @@ $app->get('/packages', function() use ($app) {
 
     $data = initJapiData($app, 'packages');
 
-    # get Packages count
-    $res = Packages::find();
-    $tnum = count($res);
-
-    setPageLinks('page', $tnum, $data, $app);
-
-    $res = Packages::find(
-        array(
-            "order" => "id DESC",
-            "limit" => $app->myapi->pglimit,
-            "offset" => $app->myapi->offset
-        )
-    );
-    $data->data = fmtData($res, 'packages.', $app)->data;
-    $data = populate_maintainer($data, $app);
+    $data = get_package('', $data, $app);
 
     if($data) json_api_encode($data, $app);
 
 });
+
+function get_package($condt='', $data=array(), $app) {
+    $params = array( 'conditions' => "$condt" );
+    # get Packages count
+    $res = Packages::find( $params );
+    $tnum = count($res);
+
+    setPageLinks('page', $tnum, $data, $app);
+
+    $params = array(
+            "conditions" => "$condt",
+            "order" => "id DESC",
+            "limit" => $app->myapi->pglimit,
+            "offset" => $app->myapi->offset
+           );
+    $res = Packages::find( $params );
+
+    $data->data = fmtData($res, 'packages.', $app)->data;
+    $data = populate_maintainer($data, $app);
+    return $data;
+}
 
 // Retrieves packages by paginations
 $app->get('/packages/page/{page:[0-9]+}', function($page) use ($app) {
@@ -452,7 +491,8 @@ $app->get('/depends/{name:[a-z]+.*}', function($name) use ($app) {
 
 $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}',
     function($rel, $pid) use ($app) {
-    $rels['install_if'] = array("install_if", 'Installif', 'install_if.pid'); # name, className, fmtName
+    # array(name, className, fmtName)
+    $rels['install_if'] = array("install_if", 'Installif', 'install_if.pid');
     $rels['provides'] = array("provides", 'Provides', 'provides.pid');
     $rels['depends'] = array("depends", 'Depends', 'depends.pid');
     $rels['contents'] = array("contents", 'Files', 'contents.pid');
@@ -818,7 +858,7 @@ function fmtData($res, $type, $app) {
     if($type === 'packages') {
         $idf = 'id';
         $rels = array( "depends", "provides", "install_if",
-                                 "origins", "contents", "flagged" );
+                       "origins", "contents", "flagged" );
     }
 
     if($type === 'maintainer') {

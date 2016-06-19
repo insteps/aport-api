@@ -17,9 +17,13 @@ Get packages list (paginated 50 items)
 ----------------------------------------
 `curl https://api.alpinelinux.org/packages | jq . | less`
 
-Basic search
+Basic search (GET)
 -----------------------------------------
 `curl https://api.alpinelinux.org/search/packages/category/v3.4:all:x86/name/_bas_ | jq . | less`
+
+Advanced search (POST)
+-----------------------------------------
+`curl -X POST https://api.alpinelinux.org/aport-api/?_url=/search/packages/page/2 -d '{"name":"_bas_","category":"edge:main:x86"}' | jq -C . | less`
 
 Get the current package that got flagged
 -----------------------------------------
