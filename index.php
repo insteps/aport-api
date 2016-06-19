@@ -172,12 +172,12 @@ The Aports API consists of the following methods: # TODO - clean text import fro
 /*
   Search by GET
   Search filters are split into key/value pairs, order/presence in uri are optional,
-  following keys/values are recogonized
+  following keys/values are recognized
   1. category/branch:repo:arch eg. category/v3.4:main:x86 ('all' keyword for any)
      defaults to category/edge:main:x86
-  2. name/<pkgname> ( wildcard recogonized '_' )
-  3. maintainer/<maintainerName>  ( wildcard recogonized '_' ) # TODO
-  4. flagged/[yes|no] # TODO
+  2. name/<pkgname> ( wildcard recognized '_' )
+  3. maintainer/<maintainerName>  ( wildcard recognized '_' ) # TODO
+  4. flagged/[yes|no]
 */
 $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters) use ($app) {
     $data = initJapiData($app, 'search');
@@ -189,7 +189,8 @@ $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters)
       $data = get_package($filter, $data, $app);
     }
 
-    $data->meta['search'] = $filter['filter2'];
+    $data->meta['search'] = $filter['filter'];
+    $data->meta['per-page'] = '<=50';
     if($data) json_api_encode($data, $app);
 
 });
@@ -205,7 +206,7 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where, $filters) use ($app) 
     #expect simple key/value pairs
     $f = (array)$app->request->getJsonRawBody();
     foreach($f as $k=>$v) { # limit key/value to 56 chars each
-        if($v) $filter[mb_substr($k, 0, 56)] = mb_substr($v, 0, 56);
+        if($v !== '') $filter[mb_substr($k, 0, 56)] = mb_substr($v, 0, 56);
     }
     unset($f);
 
@@ -224,7 +225,9 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where, $filters) use ($app) 
       //$data = get_file($filter, $data, $app); # TODO
     }
 
-    $data->meta['search'] = $filter['filter2'];
+    $data->meta['search'] = $filter['filter'];
+    $data->meta['per-page'] = '<=50';
+    $data->meta['count'] = count($data->data);
     if($data) json_api_encode($data, $app);
 
 });
@@ -250,7 +253,7 @@ function sanitize_filters($filters='', $where='', $app) {
     # Create customs filters # TODO
     $filter = set_search_category($filter);
     $filter = set_search_name_pkg($filter);
-    $filter = set_search_maint($filter);
+    //$filter = set_search_maint($filter);
     $filter = set_search_flagged($filter);
     return $filter;
 }
@@ -273,12 +276,12 @@ function set_search_category($f) {
     $f['filter'] = $cat2;
     return $f;
 }
-function set_search_glob($f, $n, $v) {
+function set_search_glob($f, $n, $v, $isCond=1) {
     $len = strlen($f[$n]);
     $l1 = $f[$n]{0} === '_' ? '%' : '';
     $l2 = $f[$n]{$len-1} === '_' ? '%' : '';
     $op = ($l1 === '%' || $l2 === '%') ? 'LIKE' : '=';
-    $f['filter2'][] = "$n $op '$l1$v$l2'";
+    if($isCond) $f['filter2'][] = "$n $op '$l1$v$l2'";
     $f['filter'][$n] = $l1.$v.$l2;
     return $f;
 }
@@ -295,7 +298,8 @@ function set_search_flagged($f) {
     if( ! array_key_exists('flagged', $f) ) return $f;
     $tdef = array('yes', 'no', ''); #accepted values
     $flagged = in_array($f['flagged'], $tdef) ? $f['flagged'] : '';
-    if('yes' === $flagged) {
+    $f['filter']['flagged'] = $flagged;
+    if('yes' === $flagged) { # only need 'yes' marked in api
         $f['filter2'][] =  "fid IS NOT NULL";
     }
     return $f;
@@ -772,7 +776,7 @@ function setPageLinks($uriPart, $tnum, $data, $app) {
     $data->meta = array(
         'total-pages' => $app->myapi->pgTotal,
         'per-page' => $app->myapi->pglimit,
-        'count' => $tnum
+        'total-count' => $tnum
     );
 
     $_reqUrl = cleanUri($app->request->get('_url'));
