@@ -185,10 +185,8 @@ $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters)
     $filter = (array)sanitize_filters($filters, $where, $app);
     if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
 
-    $conditions = implode(' AND ', $filter['filter2']);
-
     if('packages' === $where) {
-      $data = get_package($conditions, $data, $app);
+      $data = get_package($filter, $data, $app);
     }
 
     $data->meta['search'] = $filter['filter2'];
@@ -214,18 +212,15 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where, $filters) use ($app) 
     $filter['filter'] = array();
     # Create customs filters # TODO
     $filter = set_search_category($filter);
-    $filter = set_search_name($filter);
     //print_r($filter); exit;
 
-    $conditions = implode(' AND ', $filter['filter2']);
-    //$params = array( 'conditions' => "$conditions" );
-
     if('packages' === $where) {
-      $data = get_package($conditions, $data, $app);
+      $filter = set_search_name_pkg($filter);
+      $data = get_package($filter, $data, $app);
     }
 
     if('files' === $where) {
-      //$data = get_file($conditions, $data, $app); # TODO
+      //$data = get_file($filter, $data, $app); # TODO
     }
 
     $data->meta['search'] = $filter['filter2'];
@@ -253,7 +248,7 @@ function sanitize_filters($filters='', $where='', $app) {
     $filter['filter'] = array();
     # Create customs filters # TODO
     $filter = set_search_category($filter);
-    $filter = set_search_name($filter);
+    $filter = set_search_name_pkg($filter);
     $filter = set_search_maint($filter);
     $filter = set_search_flagged($filter);
     return $filter;
@@ -277,16 +272,19 @@ function set_search_category($f) {
     $f['filter'] = $cat2;
     return $f;
 }
-function set_search_name($f) {
+function set_search_glob($f, $n, $v) {
+    $len = strlen($f[$n]);
+    $l1 = $f[$n]{0} === '_' ? '%' : '';
+    $l2 = $f[$n]{$len-1} === '_' ? '%' : '';
+    $op = ($l1 === '%' || $l2 === '%') ? 'LIKE' : '=';
+    $f['filter2'][] = "$n $op '$l1$v$l2'";
+    $f['filter'][$n] = $l1.$v.$l2;
+    return $f;
+}
+function set_search_name_pkg($f) {
     if( ! array_key_exists('name', $f) ) return $f;
     $name = preg_replace('#[^a-z0-9\-\_\.]#', '', $f['name']);
-    $len = strlen($f['name']);
-    $l1 = $f['name']{0} === '_' ? '%' : '';
-    $l2 = $f['name']{$len-1} === '_' ? '%' : '';
-    $op = ($l1 === '%' || $l2 === '%') ? 'LIKE' : '=';
-    $f['filter2'][] = "name $op '$l1$name$l2'";
-    $f['filter']['name'] = $l1.$name.$l2;
-    return $f;
+    return set_search_glob($f, 'name', $name);
 }
 function set_search_maint($f) { # TODO
     if( ! array_key_exists('maint', $f) ) return $f;
@@ -312,18 +310,19 @@ $app->get('/packages', function() use ($app) {
 
     $data = initJapiData($app, 'packages');
 
-    $data = get_package('', $data, $app);
+    $data = get_package(array(), $data, $app);
 
     if($data) json_api_encode($data, $app);
 
 });
 
-function get_package($condt='', $data=array(), $app) {
+function get_package($filter=array(), $data=array(), $app) {
+    $condt = implode(' AND ', @$filter['filter2']);
     $params = array( 'conditions' => "$condt" );
+
     # get Packages count
     $res = Packages::find( $params );
     $tnum = count($res);
-
     setPageLinks('page', $tnum, $data, $app);
 
     $params = array(
