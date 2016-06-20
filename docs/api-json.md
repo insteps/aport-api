@@ -82,3 +82,9 @@ __api uri__: `<BaseURL>/maintainer/names/page/<num>`
 * Get other pages
 
 
+
+## Resources
+1. JsonApi - [http://jsonapi.org/]
+2. Jq - a lightweight and flexible command-line JSON processor [http://stedolan.github.io/jq/]
+3. Curl [http://curl.haxx.se/]
+
