@@ -11,7 +11,7 @@ Currently, any JOINS in database is being avoided and maybe used if needed.
 
 ## Relationships
 
-Following relationships exists, *emanating* from a base *package<name>*
+Following relationships exists, *emanating* from a *base package<name>*
 * origin (original package to which the **subpackage/named package** belongs to)
 * install_if 
 * provides (what the package provides)
@@ -31,7 +31,7 @@ Get packages list (paginated 50 items)
 * eg. `curl https://api.alpinelinux.org/packages | jq . | less`
 
 
-### searching
+### search
 __api uri__: `<BaseURL>/search/<where>/key1/value1/key2/value2`
 
 1. where = packages|contents
@@ -75,9 +75,10 @@ new=$(curl api.alpinelinux.org/flagged/new | jq .data[].relationships.packages.l
 ```
 
 ### maintainers
-* Get first page
-`<BaseURL>/maintainer/names`
+__api uri__: `<BaseURL>/maintainer/names`
+* Get maintainers names (50 per/page default)
+
+__api uri__: `<BaseURL>/maintainer/names/page/<num>`
 * Get other pages
-`<BaseURL>/maintainer/names/page/<num>`
 
 
