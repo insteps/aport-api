@@ -1,6 +1,6 @@
 
 
-JSONAPI implementations for aports packages.
+'''JSONAPI''' implementations for aports packages.
 
 
 Api is build around packages data and its relationships with other tables in database,
@@ -36,30 +36,31 @@ Get packages list (paginated 50 items)
 searching
 -----------
 api uri: `<BaseURL>/search/<where>/key1/value1/key2/value2`
-
 1. where = packages|contents
 2. keys = category|name|maintainer|flagged
 
 api uri: `<BaseURL>/search/packages/category/<branch>:<repo>:<arch>/name/<pkgName>`
 * Searches packages by categories and pkgName
 * Reserved keyword in categories - ''all''
-* Wildcard for package name recogonized '_'
+* Wildcard for package name recogonized - '_'
 
 
 * eg. Basic search
+
 `curl https://api.alpinelinux.org/search/packages/category/v3.4:all:x86/name/_bas_ | jq . | less`
+
 * eg. Advanced search
+
 `curl -X POST https://api.alpinelinux.org/search/packages -d '{"name":"_bas_","category":"edge:main:x86"}' | jq . | less`
 
 
 categories
 -----------
 api uri: `<BaseURL>/categories`
+* Get categories available.
+* Categories data are for branch:repo:arch (eg. edge:main:x86 )
 
-Get categories available.
-Categories are for branch:repo:arch (eg. edge:main:x86 )
-
-* eg. Get available categories
+* eg. Get all categories
 `<BaseURL>/categories`
 
 
