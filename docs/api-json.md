@@ -1,10 +1,9 @@
 
 
-# **JSONAPI** implementations for aports packages.
-
+# **JSONAPI** implementations for aports packages
 
 Api is build around packages data and its relationships with other tables in database,
-using, simple one-to-one relationships (based on foreign-key/pid/id).
+using, simple one-to-one relationships (based on *foreign-key/pid/id*).
 
 Currently, any JOINS in database is being avoided and maybe used if needed.
 
@@ -84,7 +83,7 @@ __api uri__: `<BaseURL>/maintainer/names/page/<num>`
 
 
 ## Resources
-1. JsonApi - [http://jsonapi.org/]
-2. Jq - a lightweight and flexible command-line JSON processor [http://stedolan.github.io/jq/]
-3. Curl [http://curl.haxx.se/]
+1. __JsonApi__ - [http://jsonapi.org/]
+2. __Jq__ - a lightweight and flexible command-line JSON processor [http://stedolan.github.io/jq/]
+3. __Curl__ [http://curl.haxx.se/]
 

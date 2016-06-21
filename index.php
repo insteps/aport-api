@@ -174,19 +174,19 @@ The Aports API consists of the following methods: # TODO - clean text import fro
   Search filters are split into key/value pairs, order/presence in uri are optional,
   following keys/values are recognized
   1. category/branch:repo:arch eg. category/v3.4:main:x86 ('all' keyword for any)
-     defaults to category/edge:main:x86
+     defaults to category/edge:main:x86 if error in keywords
   2. name/<pkgname> ( wildcard recognized '_' )
-  3. maintainer/<maintainerName>  ( wildcard recognized '_' ) # TODO
+  3. maintainer/<maintainerName>  ( wildcard recognized '_' )
   4. flagged/[yes|no]
 */
 $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters) use ($app) {
     $data = initJapiData($app, 'search');
 
-    //$filter = (array)sanitize_filters($filters, $where, $app);
     $_w = array('packages', 'contents');
     //$_k = array('category', 'name', 'maintainer', 'flagged'); # TODO
     if ( ! in_array($where, $_w)) return;
 
+    //$filter = (array)sanitize_filters($filters, $where, $app);
     $f = explode('/', single_slash(urldecode($filters)));
     for($c=0; $c<=count($f); $c=$c+2) { # limit key/value to 56 chars each
         if($f[$c]) $filter[mb_substr(@$f[$c], 0, 56)] = mb_substr(@$f[$c+1], 0, 56);
@@ -196,13 +196,14 @@ $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters)
     $filter['filter'] = array();
     # Create customs filters # TODO
     $filter = set_search_category($filter);
-    $filter = set_search_name_pkg($filter);
     $filter = set_search_flagged($filter);
     $filter = set_search_maint($filter);
 
     if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
 
     if('packages' === $where) {
+      $filter = set_search_name_pkg($filter);
+      $filter = set_search_orderby_pkg($filter);
       $data = get_package($filter, $data, $app);
     }
 
@@ -217,7 +218,7 @@ $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters)
   Advance Search by POST (expects simple key/value pairs in post data)
   eg. '{"name":"bas_","category":"edge:main:x86"}'
 */
-$app->post('/search/{where:[a-z0-9\_]+}', function($where, $filters) use ($app) {
+$app->post('/search/{where:[a-z0-9\_]+}', function($where) use ($app) {
     $data = initJapiData($app, 'search');
 
     $filter = array();
@@ -237,6 +238,7 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where, $filters) use ($app) 
 
     if('packages' === $where) {
       $filter = set_search_name_pkg($filter);
+      $filter = set_search_orderby_pkg($filter);
       $data = get_package($filter, $data, $app);
     }
 
@@ -295,6 +297,7 @@ function set_search_name_pkg($f) {
 }
 function set_search_maint($f) {
     if( ! array_key_exists('maintainer', $f) ) return $f;
+    # add char sanitizing # TODO
     $f = set_search_glob($f, 'maintainer', $f['maintainer'], 0);
     $_f = $f['filter']['maintainer'];
 
@@ -322,6 +325,18 @@ function set_search_flagged($f) {
     }
     return $f;
 }
+function set_search_orderby_pkg($f) { #only simple order/sort for now
+    $f['filter']['sort'] = "id DESC";
+    if( ! array_key_exists('sort', $f) ) return $f;
+    list( $fld, $or ) = explode(':', $f['sort']);
+    $fields = array('id', 'name', 'maintainer', 'build_time',
+                     'fid', 'arch','branch', 'repo');
+    $order = array('asc', 'desc');
+    $fld = in_array($fld, $fields) ? $fld : 'id';
+    $or = in_array(@$or, $order) ? $or : 'DESC';
+    $f['filter']['sort'] = "$fld $or";
+    return $f;
+}
 
 // Retrieves all categories
 $app->get('/categories', function() use ($app) {
@@ -343,16 +358,18 @@ $app->get('/packages', function() use ($app) {
 
 function get_package($filter=array(), $data=array(), $app) {
     $condt = implode(' AND ', @$filter['filter2']);
-    $params = array( 'conditions' => "$condt" );
+    $sort = $filter['filter']['sort'];
 
     # get Packages count
+    $params = array( 'conditions' => "$condt" );
     $res = Packages::find( $params );
     $tnum = count($res);
+
     setPageLinks('page', $tnum, $data, $app);
 
     $params = array(
             "conditions" => "$condt",
-            "order" => "id DESC", # add other simple orderby # TODO
+            "order" => "$sort",
             "limit" => $app->myapi->pglimit,
             "offset" => $app->myapi->offset
            );
@@ -412,7 +429,6 @@ $app->get('/packages/{id:[0-9]+}/relationships/{type}', function($id, $type) use
     }
 
     return $app->handle("/$type/$subtype/$id");
-    //$app->handle('/404');
 
 });
 
