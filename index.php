@@ -179,7 +179,7 @@ The Aports API consists of the following methods: # TODO - clean text import fro
   3. maintainer/<maintainerName>  ( wildcard recognized '_' )
   4. flagged/[yes|no]
 */
-$app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters) use ($app) {
+$app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) use ($app) {
     $data = initJapiData($app, 'search');
 
     $_w = array('packages', 'contents');
@@ -187,11 +187,12 @@ $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters)
     if ( ! in_array($where, $_w)) return;
 
     //$filter = (array)sanitize_filters($filters, $where, $app);
-    $f = explode('/', single_slash(urldecode($filters)));
+    $f = explode('/', trim(single_slash(urldecode($filters)), '/'));
     for($c=0; $c<=count($f); $c=$c+2) { # limit key/value to 56 chars each
         if($f[$c]) $filter[mb_substr(@$f[$c], 0, 56)] = mb_substr(@$f[$c+1], 0, 56);
     }
     unset($f);
+    $filter = get2filter($filter);
 
     $filter['filter'] = array();
     # Create customs filters # TODO
@@ -213,6 +214,13 @@ $app->get('/search/{where:[a-z0-9\_]+}/{filters:.*}', function($where, $filters)
     if($data) json_api_encode($data, $app);
 
 });
+
+function get2filter($f) {
+    $_k = array('category', 'name', 'maintainer', 'flagged', 'sort');
+    //$_k = array('name', 'branch', 'repo', 'arch', 'maintainer', 'flagged', 'sort');
+    foreach($_k as $v) { if(array_key_exists($v, $_GET)) $f[$v] = mb_substr($_GET[$v], 0, 56); }
+    return $f;
+}
 
 /*
   Advance Search by POST (expects simple key/value pairs in post data)
