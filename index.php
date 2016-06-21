@@ -347,7 +347,6 @@ $app->get('/categories', function() use ($app) {
 
 // Retrieves packages
 $app->get('/packages', function() use ($app) {
-
     $data = initJapiData($app, 'packages');
 
     $data = get_package(array(), $data, $app);
@@ -358,7 +357,7 @@ $app->get('/packages', function() use ($app) {
 
 function get_package($filter=array(), $data=array(), $app) {
     $condt = implode(' AND ', @$filter['filter2']);
-    $sort = $filter['filter']['sort'];
+    $sort = isset($filter['filter']['sort']) ? $filter['filter']['sort'] : "id DESC";
 
     # get Packages count
     $params = array( 'conditions' => "$condt" );
