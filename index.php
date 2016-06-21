@@ -310,7 +310,7 @@ function set_search_maint($f) {
     $res = Maintainer::find( $params );
 
     foreach($res as $d) { $a[] = $d->id; }
-    $l = preg_replace('#\,{2}+#', ',', trim(implode(',', array_unique($a)), ','));
+    $l = array2csv($a);
     if( ! empty($l)) $f['filter2'][] = "maintainer IN ($l)";
 
     return $f;
@@ -321,7 +321,7 @@ function set_search_flagged($f) {
     $flagged = in_array($f['flagged'], $tdef) ? $f['flagged'] : '';
     $f['filter']['flagged'] = $flagged;
     if('yes' === $flagged) { # only need 'yes' i.e flagged items for api
-        $f['filter2'][] =  "fid IS NOT NULL";
+        $f['filter2'][] = "fid IS NOT NULL";
     }
     return $f;
 }
@@ -441,10 +441,11 @@ $app->get('/packages/pid/{pid:[0-9]+}', function($pid) use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
+// Retrieves packages by flagged-id
 $app->get('/packages/fid/{fid:[0-9]+}', function($fid) use ($app) {
     $data = initJapiData($app, 'packages');
 
-    $res = Packages::find( array( "fid = '$fid'", "order" => "id DESC") );
+    $res = Packages::find( array( "fid = '$fid'", "order" => "id DESC" ) );
     $tnum = count($res);
     if($tnum < 1) { $app->handle('/404'); return; }
 
@@ -839,16 +840,20 @@ function single_slash($parturi) {
     return preg_replace('#\/{2}+#', '/', $parturi);
 }
 
+function array2csv($arr) {
+    return preg_replace('#\,{2}+#', ',', trim(implode(',', array_unique($arr)), ','));
+}
+
+# Populates the package maintainer field
 function populate_maintainer($data, $app) { # move to model # TODO
     // add maintainer into object data
-    //  using array method, rather than table join as in sql query
+    // using array method, rather than table join as in sql query
     foreach($data->data as $d) {
         $a[] = $d->attributes->maintainer;
     }
-    $l = trim(implode(',', array_unique($a)), ',');
-    $l = preg_replace('#\,{2}+#', ',', $l);
+    $l = array2csv($a);
     if(empty($l)) return $data;
-    $phql = "SELECT * from Maintainer where id in ($l) ";
+    $phql = "SELECT * FROM Maintainer WHERE id IN ($l) $f";
     $res2 = $app->modelsManager->executeQuery($phql);
     if( ! count($res2) > 0 ) return $data;
     $m = array();
@@ -872,40 +877,40 @@ function fmtData($res, $type, $app) {
     list($type, $subtype) = explode('.', $type);
     $jsonApi = (object)array();
     $rels = array("packages");
+    $slink = '/' . $type . '/';
 
     if($type === 'flagged') {
-        $idf = 'fid'; // identifier
+        // identifier
+        $idf = 'fid'; $self = 'fid';
     }
 
     if($type === 'install_if') {
-        $idf = 'pid';
+        $idf = 'pid'; $self = 'name';
     }
 
     if($type === 'provides') {
-        $idf = 'pid';
+        $idf = 'pid'; $self = 'name';
         //$slink = '/' . 'files' . '/'; # TODO
     }
 
     if($type === 'depends') {
-        $idf = 'pid';
+        $idf = 'pid'; $self = 'name';
     }
 
     if($type === 'contents') { # from table 'files'
-        $idf = 'id';
+        $idf = 'id'; $self = 'id';
     }
 
     if($type === 'packages') {
-        $idf = 'id';
+        $idf = 'id'; $self = 'id';
         $rels = array( "depends", "provides", "install_if",
                        "origins", "contents", "flagged" );
     }
 
     if($type === 'maintainer') {
-        $idf = 'id';
+        $idf = 'id'; $self = 'id';
         $rels = array();
     }
-
-    $slink = '/' . $type . '/';
 
     foreach ($res as $item) {
         $obj = (object)array();
@@ -922,22 +927,14 @@ function fmtData($res, $type, $app) {
         # using pid would add name in url, either add id columns to tables
         #  or deal with weird file names
 
-        if($type == 'contents' || $type === 'packages') {
-            $obj->links->self = $slink.$item->id;
-            $rlink = $slink.$item->id;
-        }
-        if($type === 'install_if' || $type === 'provides' || $type === 'depends') {
-            $obj->links->self = $slink.$item->name;
-            $rlink = $slink.$item->name;
-        }
+        $obj->links->self = $slink.$item->$self;
+
         if($type === 'depends') {
             $obj->links->self = '/packages/'.$item->name;
-            $rlink = $slink.$item->name;
         }
-        if($type === 'flagged') {
-            $obj->links->self = $slink.$item->fid;
-            $rlink = $slink.$item->fid;
-        }
+
+        $rlink = $slink.$item->$self;
+
         // some cleaning
         $obj->links->self = $app->config['apiurl'].single_slash($obj->links->self);
         unset($obj->links); // need more rationale # TODO
