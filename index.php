@@ -16,6 +16,7 @@ use Phalcon\Events\Manager as EventsManager;
 use Phalcon\Di\FactoryDefault;
 use Phalcon\Db\Adapter\Pdo\Mysql as PdoMysql;
 use Phalcon\Db\Adapter\Pdo\Sqlite as PdoSqlite;
+$time_start = microtime_float();
 
 // Application configuration data
 // -------------------------------
@@ -92,6 +93,7 @@ $eventsManager->attach('micro', function($event, $app) {
 $app = new \Phalcon\Mvc\Micro($di);
 $app->config = $config;
 $app->myapi = new stdClass;
+$app->myapi->time_start = $time_start;
 $app->myapi->pglimit = $config['app']['pglimit'];
 $app->myapi->_reqUrl = $app->request->get('_url'); #set default _reqUrl
 
@@ -672,10 +674,11 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function($name, $type
         foreach($res as $d) {
             $a[] = $d->pid;
         }
-        $l = trim(implode(',', array_unique($a)), ',');
-        $l = preg_replace('#\,{2}+#', ',', $l);
-        $phql = "SELECT * from Packages where id in ($l) ";
-        $res = $app->modelsManager->executeQuery($phql);
+        $l = array2csv($a);
+        $condt = "id IN ($l)";
+        $params = array( "conditions" => "$condt" );
+        $res = Packages::find( $params );
+        //$res = Packages::query->where('id IN (:l:)')->bind(array("l" => "1,2"))->execute(); # ??
         $tnum = count($res);
         $data->meta = array(
             'files' => $tnum
@@ -793,6 +796,21 @@ $app->get('/say/welcome/{name}', function($name) {
  Utility functions
  --------------------------
 */
+
+function microtime_float() {
+    list($usec, $sec) = explode(" ", microtime(TRUE));
+    return ((float)$usec + (float)$sec);
+}
+
+function get_meta_end($data, $app) {
+    $time_end = microtime_float();
+    $time = number_format($time_end - $app->myapi->time_start, 4);
+    $data->meta['elapsed_time'] = "$time seconds";
+    $b = memory_get_peak_usage(true);
+    $b2 = memory_get_usage(true);
+    $data->meta['memory_usage'] = $b/1024/1024 .' / ' . ($b2/1024/1024) . ' Mb';
+    return $data;
+}
 
 function getModelsMeta($tbl='', $type='fields') {
     $_k = array('Packages', 'Files', 'Maintainer', 'Flagged', 'Depends');
@@ -1069,6 +1087,7 @@ function json_api_encode($data, $app, $flags=array()) {
 
     //enable in production
     $app->response->setContentType($header['japi'])->sendHeaders();
+    $data = get_meta_end($data, $app);
     echo json_encode($data);
 }
 
