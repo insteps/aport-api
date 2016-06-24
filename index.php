@@ -483,6 +483,60 @@ $app->get('/packages/fid/{fid:[0-9]+}', function($fid) use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
+// Retrieves packages data + flagged data (included)
+// i.e a Compound Document
+$app->get('/packages/flagged', function() use ($app) {
+    $data = initJapiData($app, 'packages');
+
+    $condt = "fid IS NOT NULL";
+
+    # get Packages count
+    $params = array( 'conditions' => "$condt", "group" => "origin, branch" );
+    $res = Packages::find( $params );
+    $tnum = count($res);
+
+    setPageLinks('page', $tnum, $data, $app);
+
+    $params = array(
+            "conditions" => "$condt",
+            'columns' => 'id, origin, branch, repo, maintainer, fid',
+            "order" => "fid DESC",
+            "group" => "origin, branch",
+            "limit" => $app->myapi->pglimit,
+            "offset" => $app->myapi->offset
+           );
+    $res = Packages::find( $params );
+
+    $data->data = fmtData($res, 'packages.flagged', $app)->data;
+    $data = populate_maintainer($data, $app);
+
+    # 
+    # Associate Flagged data
+    # 
+    foreach($res as $d) { $a[] = $d->fid; }
+    $l = array2csv($a);
+    $condt = "fid IN ($l)";
+    $params = array(
+            "conditions" => "$condt",
+           );
+    $res2 = Flagged::find( $params );
+    foreach($res2 as $m1) {
+        $m[$m1->fid] = $m1;
+    }
+
+    foreach($data->data as $k=>$d) {
+        $n = (int)$d->attributes->fid;
+        if( $n >= 1 && $m[$n] ) {
+            $data->data[$k]->relationships->flagged['data'][] = array(
+                'type' => 'flagged', 'id' => "$n"
+            );
+            $data->included = fmtData($res2, 'flagged.none', $app)->data;
+        }
+    }
+
+    if($data) json_api_encode($data, $app);
+});
+
 
 $app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
     $res = Packages::findFirst( array( "id = '$pid'", 'limit' => 1 ) );
@@ -740,6 +794,27 @@ $app->get('/say/welcome/{name}', function($name) {
  --------------------------
 */
 
+function getModelsMeta($tbl='', $type='fields') {
+    $_k = array('Packages', 'Files', 'Maintainer', 'Flagged', 'Depends');
+    if( ! in_array($tbl, $_k, TRUE) ) return false;
+
+    $d = new $tbl();
+    // -------------------------
+    $metaData   = $d->getModelsMetaData();
+    if('fields' === $type) {
+        // Get table fields names
+        $attributes = $metaData->getAttributes($d);
+        return ($attributes);
+    }
+    if('dtypes' === $type) {
+        // Get table fields data types
+        $dataTypes = $metaData->getDataTypes($d);
+        return ($dataTypes);
+    }
+    return false;
+    // -------------------------
+}
+
 function isJapiReqHeader($app) { # TODO
     // Get 'Accept:' header
     // ---------------------------
@@ -972,7 +1047,7 @@ function fmtData($res, $type, $app) {
 
         // some cleaning
         $obj->links->self = $app->config['apiurl'].single_slash($obj->links->self);
-        unset($obj->links); // need more rationale # TODO
+        //unset($obj->links); // need more rationale # TODO
         $rlink = $app->config['apiurl'].single_slash($rlink.'/relationships/');
         unset($item->$idf);
 
