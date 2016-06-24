@@ -3,7 +3,7 @@
 # **JSONAPI** implementations for aports packages
 
 Api is build around packages data and its relationships with other tables in database,
-using, simple one-to-one relationships (based on *foreign-key/pid/id*).
+using, simple to-one or to-many relationships (based on *foreign-key/pid/id*).
 
 Currently, any JOINS in database is being avoided and maybe used if needed.
 

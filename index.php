@@ -199,6 +199,7 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
     $filter = set_search_category($filter);
     $filter = set_search_flagged($filter);
     $filter = set_search_maint($filter);
+    $filter = set_search_row($filter, $app);
 
     if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
 
@@ -215,16 +216,10 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
 
 });
 
-function get2filter($f) {
-    $_k = array('category', 'name', 'maintainer', 'flagged', 'sort');
-    //$_k = array('name', 'branch', 'repo', 'arch', 'maintainer', 'flagged', 'sort');
-    foreach($_k as $v) { if(array_key_exists($v, $_GET)) $f[$v] = mb_substr($_GET[$v], 0, 56); }
-    return $f;
-}
-
 /*
-  Advance Search by POST (expects simple key/value pairs in post data)
+  Advance/Complex Search by POST (expects simple key/value pairs in post data)
   eg. '{"name":"bas_","category":"edge:main:x86"}'
+  More complex keywords like 'include' and 'filter for columns' maybe implemented
 */
 $app->post('/search/{where:[a-z0-9\_]+}', function($where) use ($app) {
     $data = initJapiData($app, 'search');
@@ -269,6 +264,24 @@ $app->post('/search/{where:[a-z0-9\_]+}/page/{page:[0-9]+}', function($where, $p
 // Sanitizes and makes filters into key=>value array
 function sanitize_filters($filters='', $where='', $app) {
     return $filter;
+}
+
+function set_search_row($f=array(), $app) {
+    if( ! array_key_exists('row', $f) ) return $f;
+    $rec = explode('-', $f['row']);
+    $f['limit'] = ((int)$rec[0] >= 1) ? (int)substr($rec[0], 0, 2) : 0;
+    $f['offset'] = ((int)$rec[1] >= 1) ? (int)substr($rec[1], 0, 10) : 0;
+    
+    $app->myapi->pglimit = $f['limit']>=51 ? $app->myapi->pglimit : $f['limit'];
+    $f['filter']['limit'] = implode(',', array($f['limit'], $f['offset']));
+    return $f;
+}
+
+function get2filter($f=array()) {
+    $_k = array('category', 'name', 'maintainer', 'flagged', 'sort');
+    //$_k = array('name', 'branch', 'repo', 'arch', 'maintainer', 'flagged', 'sort');
+    foreach($_k as $v) { if(array_key_exists($v, $_GET)) $f[$v] = mb_substr($_GET[$v], 0, 56); }
+    return $f;
 }
 
 function set_search_category($f) {
@@ -368,17 +381,22 @@ function get_package($filter=array(), $data=array(), $app) {
     $sort = isset($filter['filter']['sort']) ? $filter['filter']['sort'] : "id DESC";
 
     # get Packages count
-    $params = array( 'conditions' => "$condt" );
+    $params = array(
+            'conditions' => "$condt"
+           );
     $res = Packages::find( $params );
     $tnum = count($res);
+    $tnum = (isset($filter['offset']) && $filter['offset']<=$tnum)
+             ? $tnum-$filter['offset'] : $tnum;
 
     setPageLinks('page', $tnum, $data, $app);
 
+    $_ofs = isset($filter['offset']) ? $filter['offset'] : $app->myapi->offset;
     $params = array(
-            "conditions" => "$condt",
-            "order" => "$sort",
-            "limit" => $app->myapi->pglimit,
-            "offset" => $app->myapi->offset
+            'conditions' => "$condt",
+            'order' => "$sort",
+            'limit' => $app->myapi->pglimit,
+            'offset' => $_ofs
            );
     $res = Packages::find( $params );
 
@@ -670,8 +688,9 @@ $app->get('/204', function() use ($app) {
 # Error Response 401
 $app->get('/401', function() use ($app) {
     $app->response->setStatusCode(401, "Unauthorized")->sendHeaders();
-    $data = initJapiErrData($app, 
-      array( '401', 'Access is not authorized', '' ));
+    $data = initJapiErrData($app, array(
+        '401', 'Access is not authorized', ''
+    ));
     json_api_encode($data, $app);
 });
 
@@ -682,22 +701,29 @@ $app->get('/403', function() use ($app) {
 # Error Response 404
 $app->notFound(function() use ($app) {
     $app->response->setStatusCode(404, "Not Found")->sendHeaders();
-    $data = initJapiErrData($app, 
-      array( '404', '404 - Page Not Found', 'This is crazy, but this page was not found!' ));
+    $data = initJapiErrData($app, array(
+        '404',
+        '404 - Page Not Found',
+        'This is crazy, but this page was not found!'
+    ));
     json_api_encode($data, $app);
 });
 
 # Error Response 406
 $app->get('/406', function() use ($app) {
     $app->response->setStatusCode(406, "Not Acceptable")->sendHeaders();
-    $data = initJapiErrData($app, array( '406', 'Not Acceptable', '' ));
+    $data = initJapiErrData($app, array(
+        '406', 'Not Acceptable', ''
+    ));
     json_api_encode($data, $app);
 });
 
 # Error Response 415
 $app->get('/415', function() use ($app) {
     $app->response->setStatusCode(415, "Unsupported Media Type")->sendHeaders();
-    $data = initJapiErrData($app, array( '415', 'Unsupported Media Type', '' ));
+    $data = initJapiErrData($app, array(
+        '415', 'Unsupported Media Type', ''
+    ));
     json_api_encode($data, $app);
 });
 
@@ -738,7 +764,6 @@ function isJapiReqHeader($app) { # TODO
 }
 
 function cleanUri($_reqUrl) {
-    //$_reqUrl = $app->request->get('_url');
     $pat = array('#\/{2}+#', '#\/{1}+$#');
     $rep = array('/', '');
     return preg_replace($pat, $rep, $_reqUrl);
@@ -919,6 +944,8 @@ function fmtData($res, $type, $app) {
         $idf = 'id'; $self = 'id';
         $rels = array();
     }
+
+    if('none' === $subtype) $rels = array();
 
     foreach ($res as $item) {
         $obj = (object)array();
