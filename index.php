@@ -280,9 +280,11 @@ function set_search_row($f=array(), $app) {
 }
 
 function get2filter($f=array()) {
-    $_k = array('category', 'name', 'maintainer', 'flagged', 'sort');
-    //$_k = array('name', 'branch', 'repo', 'arch', 'maintainer', 'flagged', 'sort');
-    foreach($_k as $v) { if(array_key_exists($v, $_GET)) $f[$v] = mb_substr($_GET[$v], 0, 56); }
+    $_k = array('category', 'branch', 'repo', 'arch',
+                'name', 'maintainer', 'flagged', 'sort');
+    foreach($_k as $v) {
+        if(array_key_exists($v, $_GET)) $f[$v] = mb_substr($_GET[$v], 0, 56);
+    }
     return $f;
 }
 
@@ -296,7 +298,8 @@ function set_search_category($f) {
     $cat = explode(':', $f['category']);
     foreach($t as $t0=>$t1) {
        if($cat[$t0] === 'all') continue; 
-       $cat2[$t1] = in_array($cat[$t0], $f['all_category'][$t1]) ? $cat[$t0] : $tdef[$t0];
+       $tmp = isset($f[$t1]) ? $f[$t1] : $cat[$t0];
+       $cat2[$t1] = in_array($tmp, $f['all_category'][$t1]) ? $tmp : $tdef[$t0];
     }
     foreach($cat2 as $t0=>$t1) {
         $f['filter2'][] = "$t0 = '$t1'";
@@ -808,7 +811,7 @@ function get_meta_end($data, $app) {
     $data->meta['elapsed_time'] = "$time seconds";
     $b = memory_get_peak_usage(true);
     $b2 = memory_get_usage(true);
-    $data->meta['memory_usage'] = $b/1024/1024 .' / ' . ($b2/1024/1024) . ' Mb';
+    $data->meta['memory_usage'] = ($b/1024/1024) .' / ' . ($b2/1024/1024) . ' Mb';
     return $data;
 }
 
