@@ -23,7 +23,7 @@ Following relationships exists, *emanating* from a *base package<name>*
 https://api.alpinelinux.org/
 
 ### packages
-__api uri__: `<BaseURL>/packages/...`
+__api uri__: `GET <BaseURL>/packages/...`
 
 Get packages list (paginated 50 items)
 
@@ -31,12 +31,12 @@ Get packages list (paginated 50 items)
 
 
 ### search
-__api uri__: `<BaseURL>/search/<where>/key1/value1/key2/value2`
+__api uri__: `GET <BaseURL>/search/<where>/key1/value1/key2/value2`
 
 1. where = packages|contents
 2. keys = category|name|maintainer|flagged
 
-__api uri__: `<BaseURL>/search/packages/category/<branch>:<repo>:<arch>/name/<pkgName>`
+__api uri__: `GET <BaseURL>/search/packages/category/<branch>:<repo>:<arch>/name/<pkgName>`
 * Searches packages by categories and pkgName
 * Reserved keyword in categories - ''all''
 * Wildcard for package name recogonized - '_'
@@ -45,14 +45,14 @@ __api uri__: `<BaseURL>/search/packages/category/<branch>:<repo>:<arch>/name/<pk
 
 `curl https://api.alpinelinux.org/search/packages/category/v3.4:all:x86/name/_bas_ | jq . | less`
 
-* eg. Advanced search
+* eg. Advanced search (POST)
 ```
 curl -X POST https://api.alpinelinux.org/search/packages -d '{"name":"_bas_","category":"edge:main:x86"}' | jq . | less
 ```
 
 
 ### categories
-__api uri__: `<BaseURL>/categories`
+__api uri__: `GET <BaseURL>/categories`
 * Get categories available.
 * Categories data are for branch:repo:arch (eg. edge:main:x86 )
 
@@ -61,11 +61,11 @@ __api uri__: `<BaseURL>/categories`
 
 
 ### flagged packages
-__api uri__: `<BaseURL>/flagged`
+__api uri__: `GET <BaseURL>/flagged`
 * Get flagged data (paginated) (follow relationships link to get package data)
 * `<BaseURL>/flagged/page/<num>` - more items (older)
 
-__api uri__: `<BaseURL>/flagged/new`
+__api uri__: `GET <BaseURL>/flagged/new`
 * Get current flagged item
 
 * How to get the current package that got flagged
@@ -74,10 +74,10 @@ new=$(curl api.alpinelinux.org/flagged/new | jq .data[].relationships.packages.l
 ```
 
 ### maintainers
-__api uri__: `<BaseURL>/maintainer/names`
+__api uri__: `GET <BaseURL>/maintainer/names`
 * Get maintainers names (50 per/page default)
 
-__api uri__: `<BaseURL>/maintainer/names/page/<num>`
+__api uri__: `GET <BaseURL>/maintainer/names/page/<num>`
 * Get other pages
 
 

@@ -712,15 +712,16 @@ $app->get('/maintainer/names', function() use ($app) {
     $data = initJapiData($app, 'maintainer');
 
     # get Packages count
-    $res = Maintainer::find();
-    $tnum = count($res);
+    $res = Maintainer::find(array("group" => "name"));
+    $app->myapi->pglimit = $tnum = count($res);
     setPageLinks('page', $tnum, $data, $app);
 
     $res = Maintainer::find(
         array(
             'columns' => 'id, name',
             "order" => "name ASC",
-            "limit" => $app->myapi->pglimit,
+            "group" => "name", # use distinct ??
+            "limit" => $app->myapi->pglimit, # get fulllist for now
             "offset" => $app->myapi->offset
         )
     );
