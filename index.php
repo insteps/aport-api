@@ -282,7 +282,8 @@ function set_search_row($f=array(), $app) {
 
 function get2filter($f=array()) {
     $_k = array('category', 'branch', 'repo', 'arch',
-                'name', 'maintainer', 'flagged', 'sort', 'row');
+                'name', 'maintainer', 'flagged', 'sort',
+                'page', 'row');
     foreach($_k as $v) {
         if(array_key_exists($v, $_GET)) $f[$v] = mb_substr($_GET[$v], 0, 56);
     }
