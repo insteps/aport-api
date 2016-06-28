@@ -292,15 +292,18 @@ function get2filter($f=array()) {
 function set_search_category($f) {
     $t = array('branch', 'repo', 'arch');
     $tdef = array('edge', 'main', 'x86_64'); #defaults
-    if( ! array_key_exists('category', $f) ) $f['category']='::';
+    if(isset($f['branch']) || isset($f['repo']) || isset($f['arch'])) {
+        foreach($t as $v) { $f[$v] = isset($f[$v]) ? $f[$v] : 'all'; }
+        $f['category'] = $f['branch'].':'.$f['repo'].':'.$f['arch'];
+    }
+    if( ! array_key_exists('category', $f) ) return $f;
     $f['category'] = preg_replace('#[^\w\d\:\_\-\.]#', '', $f['category']);
 
     $f['all_category'] = get_all_category();
     $cat = explode(':', $f['category']);
     foreach($t as $t0=>$t1) {
        if($cat[$t0] === 'all') continue; 
-       $tmp = isset($f[$t1]) ? $f[$t1] : $cat[$t0];
-       $cat2[$t1] = in_array($tmp, $f['all_category'][$t1]) ? $tmp : $tdef[$t0];
+       $cat2[$t1] = in_array($cat[$t0], $f['all_category'][$t1]) ? $cat[$t0] : $tdef[$t0];
     }
     foreach($cat2 as $t0=>$t1) {
         $f['filter2'][] = "$t0 = '$t1'";
