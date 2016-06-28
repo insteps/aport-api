@@ -239,6 +239,7 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where) use ($app) {
     $filter = set_search_category($filter);
     $filter = set_search_flagged($filter);
     $filter = set_search_maint($filter);
+    $filter = set_search_row($filter, $app);
     //print_r($filter); exit;
 
     if('packages' === $where) {
@@ -281,7 +282,7 @@ function set_search_row($f=array(), $app) {
 
 function get2filter($f=array()) {
     $_k = array('category', 'branch', 'repo', 'arch',
-                'name', 'maintainer', 'flagged', 'sort');
+                'name', 'maintainer', 'flagged', 'sort', 'row');
     foreach($_k as $v) {
         if(array_key_exists($v, $_GET)) $f[$v] = mb_substr($_GET[$v], 0, 56);
     }
@@ -291,7 +292,7 @@ function get2filter($f=array()) {
 function set_search_category($f) {
     $t = array('branch', 'repo', 'arch');
     $tdef = array('edge', 'main', 'x86_64'); #defaults
-    if( ! array_key_exists('category', $f) ) return $f;
+    if( ! array_key_exists('category', $f) ) $f['category']='::';
     $f['category'] = preg_replace('#[^\w\d\:\_\-\.]#', '', $f['category']);
 
     $f['all_category'] = get_all_category();
@@ -351,7 +352,9 @@ function set_search_flagged($f) {
     }
     return $f;
 }
-function set_search_orderby_pkg($f) { #only simple order/sort for now
+// only simple order/sort for now
+// eg. sort/name:asc or ?sort=name:asc
+function set_search_orderby_pkg($f) {
     $f['filter']['sort'] = "id DESC";
     if( ! array_key_exists('sort', $f) ) return $f;
     list( $fld, $or ) = explode(':', $f['sort']);
@@ -674,9 +677,7 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function($name, $type
         $pid = $res[0]->pid;
 
         # ---------------------
-        foreach($res as $d) {
-            $a[] = $d->pid;
-        }
+        foreach($res as $d) { $a[] = $d->pid; }
         $l = array2csv($a);
         $condt = "id IN ($l)";
         $params = array( "conditions" => "$condt" );
@@ -820,8 +821,8 @@ function getModelsMeta($tbl='', $type='fields') {
     if( ! in_array($tbl, $_k, TRUE) ) return false;
 
     $d = new $tbl();
+    $metaData = $d->getModelsMetaData();
     // -------------------------
-    $metaData   = $d->getModelsMetaData();
     if('fields' === $type) {
         // Get table fields names
         $attributes = $metaData->getAttributes($d);
@@ -987,8 +988,7 @@ function populate_maintainer($data, $app) { # move to model # TODO
     if( ! count($res2) > 0 ) return $data;
     $m = array();
     foreach($res2 as $m1) {
-        $m[$m1->id]['name'] = $m1->name;
-        $m[$m1->id]['email'] = $m1->email;
+        $m[$m1->id] = ['name' => $m1->name, 'email' => $m1->email];
     }
     foreach($data->data as $d) {
         $n = (int)$d->attributes->maintainer;
