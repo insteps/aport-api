@@ -285,7 +285,9 @@ function get2filter($f=array()) {
                 'name', 'maintainer', 'flagged', 'sort',
                 'page', 'row');
     foreach($_k as $v) {
-        if(array_key_exists($v, $_GET)) $f[$v] = mb_substr($_GET[$v], 0, 56);
+        if(array_key_exists($v, $_GET) && trim($_GET[$v]) !== '') {
+            $f[$v] = mb_substr($_GET[$v], 0, 56);
+        }
     }
     return $f;
 }
@@ -379,13 +381,14 @@ $app->get('/categories', function() use ($app) {
 });
 
 // Retrieves packages
-$app->get('/packages', function() use ($app) {
+$app->get('/packages{filters:.*}', function($filters) use ($app) {
+    if($filters !== '' || count($_GET) >= 2) {
+        $app->handle("/search/packages/$filters"); return;
+    }
     $data = initJapiData($app, 'packages');
-
+    
     $data = get_package(array(), $data, $app);
-
     if($data) json_api_encode($data, $app);
-
 });
 
 function get_package($filter=array(), $data=array(), $app) {
@@ -426,10 +429,10 @@ $app->get('/packages/page/{page:[0-9]+}', function($page) use ($app) {
 // Retrieves packages by name
 $app->get('/packages/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
     // Retrieves packages by paginations (defaults)
-    if($name === 'page') { return $app->handle("/packages"); }
+    if($name === 'page') { $app->handle("/packages"); return; }
 
     // assuming there is no pkg named 'page'
-    return $app->handle("/packages/name/$name");
+    $app->handle("/packages/name/$name"); return;
 });
 
 $app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
@@ -452,7 +455,7 @@ $app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
 // but should pick single pkg with that ID.
 // we are not expecting any pgk <names> with digits only, are we ?
 $app->get('/packages/{pid:[0-9]+}', function($pid) use ($app) {
-    return $app->handle("/packages/pid/$pid");
+    $app->handle("/packages/pid/$pid"); return;
 });
 
 // Retrieves packages by relationships
@@ -465,7 +468,7 @@ $app->get('/packages/{id:[0-9]+}/relationships/{type}', function($id, $type) use
         $id = $res->fid;
     }
 
-    return $app->handle("/$type/$subtype/$id");
+    $app->handle("/$type/$subtype/$id"); return;
 
 });
 
@@ -553,7 +556,7 @@ $app->get('/packages/flagged', function() use ($app) {
 $app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
     $res = Packages::findFirst( array( "id = '$pid'", 'limit' => 1 ) );
     $origin = $res->origin;
-    return $app->handle("/packages/name/$origin");
+    $app->handle("/packages/name/$origin"); return;
 });
 
 
@@ -600,16 +603,16 @@ $app->get('/flagged/page/{page:[0-9]+}', function($page) use ($app) {
 });
 
 $app->get('/flagged/{fid:[0-9]+}', function($fid) use ($app) {
-    return $app->handle("/flagged/pid/$fid");
+    $app->handle("/flagged/pid/$fid"); return;
 });
 
 $app->get('/flagged/fid/{fid:[0-9]+}', function($fid) use ($app) {
-    return $app->handle("/flagged/pid/$fid");
+    $app->handle("/flagged/pid/$fid"); return;
 });
 
 $app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function($fid, $type) use ($app) {
     if($type === 'packages') {
-        return $app->handle("/packages/fid/$fid");
+        $app->handle("/packages/fid/$fid"); return;
     }
     $app->handle('/404');
 });
@@ -640,23 +643,23 @@ $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}'
     # data
     $res = $_r[1]::find( array( "$subtype = '$pid'") );
     $tnum2 = count($res);
-    if( ! $tnum2 > 0) return $app->handle('/404');
+    if( ! $tnum2 > 0) { $app->handle('/404'); return; }
 
     //setPageLinks('page', $tnum2, $data, $app);
     $data->meta['total-files'] = $tnum;
     $data->meta['pkg-count'] = $tnum2;
 
     $data->data = fmtData($res, $_r[2], $app)->data;
-    return json_api_encode($data, $app);
+    json_api_encode($data, $app); return;
 });
 
 // Retrieves contents(files) by id
 $app->get('/contents/id/{id:[0-9]+}', function($id) use ($app) {
     $data = initJapiData($app, 'contents');
     $res = Files::find( array( "id = '$id'", 'limit' => 1) );
-    if( ! count($res) > 0) return $app->handle('/404');
+    if( ! count($res) > 0) { $app->handle('/404'); return; }
     $data->data = fmtData($res, 'contents.id', $app)->data;
-    return json_api_encode($data, $app);
+    json_api_encode($data, $app); return;
 });
 
 // Retrieves package data by its content(files->id) relationships
@@ -664,7 +667,7 @@ $app->get('/contents/{id:[0-9]+}/relationships/{type}', function($id, $type) use
     if($type === 'packages') {
         $res = Files::find( array( "id = '$id'", 'limit' => 1) );
         $pid = $res[0]->pid;
-        return $app->handle("/packages/$pid");
+        $app->handle("/packages/$pid"); return;
     }
     $app->handle('/404');
 });
@@ -677,7 +680,7 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function($name, $type
 
     if($type === 'packages') {
         $res = Depends::find( array( "name = '$name'") );
-        if( ! count($res) > 0) return $app->handle('/404');
+        if( ! count($res) > 0) { $app->handle('/404'); return; }
         $pid = $res[0]->pid;
 
         # ---------------------
@@ -695,7 +698,7 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function($name, $type
         $data->data = fmtData($res, 'packages.', $app)->data;
         $data = populate_maintainer($data, $app);
 
-        return json_api_encode($data, $app);
+        json_api_encode($data, $app); return;
         # ---------------------
 
         //return $app->handle("/packages/$pid"); # TODO
