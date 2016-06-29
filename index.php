@@ -211,6 +211,7 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
       $data = get_package($filter, $data, $app);
     }
 
+    $filter['filter']['page'] = $app->myapi->reqPage;
     $data->meta['search'] = $filter['filter'];
     $data->meta['per-page'] = '<=50';
     $data->meta['count'] = count($data->data);
@@ -252,6 +253,7 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where) use ($app) {
       //$data = get_file($filter, $data, $app); # TODO
     }
 
+    $filter['filter']['page'] = $app->myapi->reqPage;
     $data->meta['search'] = $filter['filter'];
     $data->meta['per-page'] = '<=50';
     $data->meta['count'] = count($data->data);
