@@ -95,6 +95,7 @@ $app->config = $config;
 $app->myapi = new stdClass;
 $app->myapi->time_start = $time_start;
 $app->myapi->pglimit = $config['app']['pglimit'];
+$app->myapi->reqPage = 1;
 $app->myapi->_reqUrl = $app->request->get('_url'); #set default _reqUrl
 
 // Bind the events manager to the app
@@ -394,7 +395,7 @@ $app->get('/packages{filters:.*}', function($filters) use ($app) {
 });
 
 function get_package($filter=array(), $data=array(), $app) {
-    $condt = implode(' AND ', @$filter['filter2']);
+    $condt = isset($filter['filter2']) ? implode(' AND ', $filter['filter2']) : '';
     $sort = isset($filter['filter']['sort']) ? $filter['filter']['sort'] : "id DESC";
 
     # get Packages count
@@ -714,7 +715,7 @@ $app->get('/maintainer/names', function() use ($app) {
     $data = initJapiData($app, 'maintainer');
 
     # get Packages count
-    $res = Maintainer::find(array("group" => "name"));
+    $res = Maintainer::count(array("group" => "name"));
     $app->myapi->pglimit = $tnum = count($res);
     setPageLinks('page', $tnum, $data, $app);
 
@@ -812,7 +813,7 @@ $app->get('/say/welcome/{name}', function($name) {
 */
 
 function microtime_float() {
-    list($usec, $sec) = explode(" ", microtime(TRUE));
+    list($usec, $sec) = explode(" ", microtime());
     return ((float)$usec + (float)$sec);
 }
 
@@ -993,7 +994,7 @@ function populate_maintainer($data, $app) { # move to model # TODO
     }
     $l = array2csv($a);
     if(empty($l)) return $data;
-    $phql = "SELECT * FROM Maintainer WHERE id IN ($l) $f";
+    $phql = "SELECT * FROM Maintainer WHERE id IN ($l)";
     $res2 = $app->modelsManager->executeQuery($phql);
     if( ! count($res2) > 0 ) return $data;
     $m = array();
