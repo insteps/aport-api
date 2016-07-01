@@ -1102,7 +1102,15 @@ function json_api_encode($data, $app, $flags=array()) {
     //enable in production
     $app->response->setContentType($header['japi'])->sendHeaders();
     $data = get_meta_end($data, $app);
-    echo json_encode($data);
+
+    //JSONP
+    if(isset($_GET['aportsjsonp']) || isset($_GET['callback'])) {
+        $callback = $_GET['aportsjsonp'] ? 'aportsjsonp' : $_GET['callback'];
+        echo $callback.'(' . json_encode($data) . ')';
+    } else {
+        echo json_encode($data);
+    }
+
 }
 
 // --------------------------
