@@ -653,7 +653,12 @@ $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}'
     $data->meta['total-files'] = $tnum;
     $data->meta['pkg-count'] = $tnum2;
 
+    if($rel == 'contents') {
+        $d = $res[0]->pkgname;
+        $data->links->related = $app->config['apiurl'].'/packages/'.$d;
+    }
     $data->data = fmtData($res, $_r[2], $app)->data;
+
     json_api_encode($data, $app); return;
 });
 
@@ -1016,7 +1021,7 @@ function fmtData($res, $type, $app) {
 
     list($type, $subtype) = explode('.', $type);
     $jsonApi = (object)array();
-    $rels = array("packages");
+    $rels = array("packages"); $_unset = array();
     $slink = '/' . $type . '/';
 
     if($type === 'flagged') {
@@ -1039,6 +1044,7 @@ function fmtData($res, $type, $app) {
 
     if($type === 'contents') { # from table 'files'
         $idf = 'id'; $self = 'id';
+        $_unset = ['pkgname', 'pid'];
     }
 
     if($type === 'packages') {
@@ -1081,7 +1087,9 @@ function fmtData($res, $type, $app) {
         $obj->links->self = $app->config['apiurl'].single_slash($obj->links->self);
         //unset($obj->links); // need more rationale # TODO
         $rlink = $app->config['apiurl'].single_slash($rlink.'/relationships/');
+        // removes fields not needed
         unset($item->$idf);
+        foreach($_unset as $u) unset($item->$u);
 
         if(count($rels) >= 1) {
             # make relationships objects links
