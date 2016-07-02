@@ -96,7 +96,8 @@ $app->myapi = new stdClass;
 $app->myapi->time_start = $time_start;
 $app->myapi->pglimit = $config['app']['pglimit'];
 $app->myapi->reqPage = 1;
-$app->myapi->_reqUrl = $app->request->get('_url'); #set default _reqUrl
+#set/clean requested _url
+$app->myapi->_reqUrl = cleanUri($app->request->get('_url'));
 
 // Bind the events manager to the app
 $app->setEventsManager($eventsManager);
@@ -190,6 +191,7 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
     //$_k = array('category', 'name', 'maintainer', 'flagged'); # TODO
     if ( ! in_array($where, $_w)) return;
 
+    $filter = array();
     //$filter = (array)sanitize_filters($filters, $where, $app);
     $f = explode('/', trim(single_slash(urldecode($filters)), '/'));
     for($c=0; $c<=count($f); $c=$c+2) { # limit key/value to 56 chars each
@@ -571,8 +573,7 @@ $app->get('/flagged', function() use ($app) {
     $res = Flagged::find();
     $tnum = count($res);
 
-    $parturi = $app->request->get()['_url'];
-    if( $parturi !== '/flagged/new') {
+    if( $app->myapi->_reqUrl !== '/flagged/new') {
         setPageLinks('page', $tnum, $data, $app);
     }
 
@@ -641,8 +642,7 @@ $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}'
 
     $data = initJapiData($app, $_r[0]);
     # meta
-    $res = $_r[1]::find();
-    $tnum = count($res);
+    $tnum = $_r[1]::count();
 
     # data
     $res = $_r[1]::find( array( "$subtype = '$pid'") );
@@ -884,9 +884,8 @@ function initJapiData($app, $type='') {
     $data->jsonapi = array('version' => '1.0');
     $data->meta = array();
 
-    $_reqUrl = cleanUri($app->request->get('_url'));
     $data->links = (object)array();
-    $data->links->self = $app->config['apiurl'] . $_reqUrl;
+    $data->links->self = $app->config['apiurl'] . $app->myapi->_reqUrl;
     return $data;
 }
 
@@ -1106,7 +1105,7 @@ function json_api_encode($data, $app, $flags=array()) {
 
     //JSONP
     if(isset($_GET['aportsjsonp']) || isset($_GET['callback'])) {
-        $callback = $_GET['aportsjsonp'] ? 'aportsjsonp' : $_GET['callback'];
+        $callback = @$_GET['aportsjsonp'] ? 'aportsjsonp' : @$_GET['callback'];
         echo $callback.'(' . json_encode($data) . ')';
     } else {
         echo json_encode($data);
