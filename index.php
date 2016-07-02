@@ -136,7 +136,8 @@ $app->get('/about', function() use ($app, $config) {
     $data->meta = array(
         'version' => $config['version'],
         'backend' => '',
-        'apiurl' => $config['apiurl']
+        'apiurl' => $config['apiurl'],
+        'apiurl_rst' => explode('?', $config['apiurl'])[0]
     );
     $data->data[] = (object)array();
     json_api_encode($data, $app);
