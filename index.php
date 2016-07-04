@@ -211,6 +211,7 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
 
     if('packages' === $where) {
       $filter = set_search_name_pkg($filter);
+      $filter = set_search_version_pkg($filter);
       $filter = set_search_orderby_pkg($filter);
       $data = get_package($filter, $data, $app);
     }
@@ -249,6 +250,7 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where) use ($app) {
 
     if('packages' === $where) {
       $filter = set_search_name_pkg($filter);
+      $filter = set_search_version_pkg($filter);
       $filter = set_search_orderby_pkg($filter);
       $data = get_package($filter, $data, $app);
     }
@@ -330,9 +332,14 @@ function set_search_glob($f, $n, $v, $isCond=1) {
     return $f;
 }
 function set_search_name_pkg($f) {
-    if( ! array_key_exists('name', $f) ) return $f;
-    $name = preg_replace('#[^a-z0-9\-\_\.]#', '', $f['name']);
-    return set_search_glob($f, 'name', $name);
+    $n = 'name'; if( ! array_key_exists($n, $f) ) return $f;
+    $nv = preg_replace('#[^a-z0-9\-\_\.]#', '', $f[$n]);
+    return set_search_glob($f, $n, $nv);
+}
+function set_search_version_pkg($f) {
+    $n = 'version'; if( ! array_key_exists($n, $f) ) return $f;
+    $nv = preg_replace('#[^a-z0-9\-\_\.]#', '', $f[$n]);
+    return set_search_glob($f, $n, $nv);
 }
 function set_search_maint($f) {
     if( ! array_key_exists('maintainer', $f) ) return $f;
