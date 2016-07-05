@@ -98,6 +98,7 @@ $app->myapi->pglimit = $config['app']['pglimit'];
 $app->myapi->reqPage = 1;
 #set/clean requested _url
 $app->myapi->_reqUrl = cleanUri($app->request->get('_url'));
+$app->myapi->flags = '';
 
 // Bind the events manager to the app
 $app->setEventsManager($eventsManager);
@@ -324,8 +325,8 @@ function set_search_category($f) {
 }
 function set_search_glob($f, $n, $v, $isCond=1) {
     $len = strlen($f[$n]);
-    $l1 = $f[$n]{0} === '_' ? '%' : '';
-    $l2 = $f[$n]{$len-1} === '_' ? '%' : '';
+    $l1 = $v{0} === '_' ? '%' : '';
+    $l2 = $v{$len-1} === '_' ? '%' : '';
     $op = ($l1 === '%' || $l2 === '%') ? 'LIKE' : '=';
     if($isCond) $f['filter2'][] = "$n $op '$l1$v$l2'";
     $f['filter'][$n] = $l1.$v.$l2;
@@ -339,6 +340,7 @@ function set_search_name_pkg($f) {
 function set_search_version_pkg($f) {
     $n = 'version'; if( ! array_key_exists($n, $f) ) return $f;
     $nv = preg_replace('#[^a-z0-9\-\_\.]#', '', $f[$n]);
+    $nv = trim($nv, '_');
     return set_search_glob($f, $n, $nv);
 }
 function set_search_maint($f) {
@@ -573,53 +575,63 @@ $app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
 });
 
 
-$app->get('/flagged', function() use ($app) {
+$app->get('/flagged/{filter:.*}', function($filter) use ($app) {
     $data = initJapiData($app, 'flagged');
+    $cols = 'fid, created, reporter, new_version, message';
+    $condt = '';
 
     # get Packages count
-    $res = Flagged::find();
-    $tnum = count($res);
+    $tnum = Flagged::count();
 
-    if( $app->myapi->_reqUrl !== '/flagged/new') {
+    // Retrieves flagged (latest)
+    if( $app->myapi->_reqUrl == '/flagged/new') {
+        $app->myapi->pglimit = 1;
+    } else {
         setPageLinks('page', $tnum, $data, $app);
     }
 
-    $res = Flagged::find(
-        array(
+    if('fids' === $app->myapi->flags) {
+        list($n, $l) = explode('/', $filter);
+        $condt = "fid IN ($l)";
+        $cols = 'fid, created';
+    }
+
+    $params = array(
+            'columns' => $cols,
+            "conditions" => "$condt",
             "order" => "created DESC",
             "limit" => $app->myapi->pglimit,
             "offset" => $app->myapi->offset
-        )
-    );
+           );
+    $res = Flagged::find( $params );
+
+    $data->meta['count'] = count($res);
     $data->data = fmtData($res, 'flagged.', $app)->data;
 
     if($data) json_api_encode($data, $app);
 
 });
 
-// Retrieves flagged (latest)
-$app->get('/flagged/new', function($page) use ($app) {
-    $app->myapi->pglimit = 1;
-    $app->handle("/flagged");
-});
-
 // Retrieves flagged by paginations (defaults)
-$app->get('/flagged/page', function($page) use ($app) {
-    $app->handle("/flagged");
+$app->get('/flagged', function($page) use ($app) {
+    $app->handle("/flagged/list");
 });
 
 // Retrieves flagged by paginations
 $app->get('/flagged/page/{page:[0-9]+}', function($page) use ($app) {
     $app->myapi->reqPage = (int)$page;
-    $app->handle("/flagged");
+    $app->handle("/flagged/list");
 });
 
 $app->get('/flagged/{fid:[0-9]+}', function($fid) use ($app) {
     $app->handle("/flagged/pid/$fid"); return;
 });
 
-$app->get('/flagged/fid/{fid:[0-9]+}', function($fid) use ($app) {
-    $app->handle("/flagged/pid/$fid"); return;
+$app->get('/flagged/fid/{fid:[0-9\,]+}', function($fid) use ($app) {
+    $app->myapi->flags = 'fids';
+//    $fids = explode(',', $fid);
+    $fids = array2csv(explode(',', $fid)); //clean array # TODO
+    $app->handle("/flagged/fids/$fids"); return;
 });
 
 $app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function($fid, $type) use ($app) {
@@ -657,8 +669,8 @@ $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}'
     if( ! $tnum2 > 0) { $app->handle('/404'); return; }
 
     //setPageLinks('page', $tnum2, $data, $app);
-    $data->meta['total-files'] = $tnum;
-    $data->meta['pkg-count'] = $tnum2;
+    $data->meta['total-count'] = $tnum;
+    $data->meta['count'] = $tnum2;
 
     if($rel == 'contents') {
         $d = $res[0]->pkgname;
@@ -708,7 +720,7 @@ $app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function($name, $type
         //$res = Packages::query->where('id IN (:l:)')->bind(array("l" => "1,2"))->execute(); # ??
         $tnum = count($res);
         $data->meta = array(
-            'files' => $tnum
+            'count' => $tnum
         );
 
         $data->data = fmtData($res, 'packages.', $app)->data;
@@ -836,7 +848,7 @@ function get_meta_end($data, $app) {
     $data->meta['elapsed_time'] = "$time seconds";
     $b = memory_get_peak_usage(true);
     $b2 = memory_get_usage(true);
-    $data->meta['memory_usage'] = ($b/1024/1024) .' / ' . ($b2/1024/1024) . ' Mb';
+    $data->meta['memory_usage'] = ($b/1024/1024).' / '.($b2/1024/1024).' Mb';
     return $data;
 }
 
