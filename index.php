@@ -192,23 +192,13 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
     //$_k = array('category', 'name', 'maintainer', 'flagged'); # TODO
     if ( ! in_array($where, $_w)) return;
 
-    $filter = array();
-    //$filter = (array)sanitize_filters($filters, $where, $app);
-    $f = explode('/', trim(single_slash(urldecode($filters)), '/'));
-    for($c=0; $c<=count($f); $c=$c+2) { # limit key/value to 56 chars each
-        if($f[$c]) $filter[mb_substr(@$f[$c], 0, 56)] = mb_substr(@$f[$c+1], 0, 56);
-    }
-    unset($f);
-    $filter = get2filter($filter);
+    $filter = (array)sanitize_filters($filters, $where, $app);
 
-    $filter['filter'] = array();
     # Create customs filters # TODO
     $filter = set_search_category($filter);
     $filter = set_search_flagged($filter);
     $filter = set_search_maint($filter);
     $filter = set_search_row($filter, $app);
-
-    if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
 
     if('packages' === $where) {
       $filter = set_search_name_pkg($filter);
@@ -218,7 +208,6 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
       $data = get_package($filter, $data, $app);
     }
 
-    $filter['filter']['page'] = $app->myapi->reqPage;
     $data->meta['search'] = $filter['filter'];
     $data->meta['per-page'] = '<=50';
     $data->meta['count'] = count($data->data);
@@ -276,7 +265,18 @@ $app->post('/search/{where:[a-z0-9\_]+}/page/{page:[0-9]+}', function($where, $p
 });
 
 // Sanitizes and makes filters into key=>value array
-function sanitize_filters($filters='', $where='', $app) {
+function sanitize_filters($filters='', $where='', $app='') {
+    $filter = array();
+    $f = explode('/', trim(single_slash(urldecode($filters)), '/'));
+    for($c=0; $c<=count($f)-1; $c=$c+2) { # limit key/value to 56 chars each
+        if($f[$c]) $filter[mb_substr(@$f[$c], 0, 56)] = mb_substr(@$f[$c+1], 0, 56);
+    }
+    unset($f);
+    $filter = get2filter($filter);
+    //common filters
+    $filter['filter'] = array();
+    if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
+    $filter['filter']['page'] = $app->myapi->reqPage;
     return $filter;
 }
 
@@ -485,7 +485,7 @@ $app->get('/packages/{id:[0-9]+}/relationships/{type}', function($id, $type) use
         $id = $res->fid;
     }
 
-    $app->handle("/$type/$subtype/$id"); return;
+    if($id) { $app->handle("/$type/$subtype/$id"); } else {  $app->handle('/404'); }
 
 });
 
@@ -497,6 +497,43 @@ $app->get('/packages/pid/{pid:[0-9]+}', function($pid) use ($app) {
     $data->data = fmtData($res, 'packages.id', $app)->data;
     $data = populate_maintainer($data, $app);
     if($data) json_api_encode($data, $app);
+});
+
+// Retrieves Dependencies for packages->id
+$app->get('/packages/id/{pid:[0-9]+}/{type}{filters:.*}', function($pid, $type, $filters) use ($app) {
+    $data = initJapiData($app, 'packages');
+
+    $filter = (array)sanitize_filters($filters, '', $app);
+
+    if('depends' === $type) {
+        $res = Depends::find( array( "pid = '$pid'" ) );
+        if(count($res) < 1) { $app->handle('/404'); return; }
+
+        foreach($res as $d) { $a[] = "\"$d->name\""; }
+        $l = array2csv($a);
+        $condt = "name IN ($l)";
+        $params = array( "conditions" => "$condt", 'DISTINCT' => "name" );
+        $res = Provides::find( $params );
+        if(count($res) < 1) { $app->handle('/404'); return; }
+
+        foreach($res as $d) { $a[] = $d->pid; }
+        $l = array2csv($a);
+        $condt = "id IN ($l)";
+        //apply filters
+
+        $filter['filter2'] =  array();
+        $filter['filter2'][] = "id IN ($l)";
+        $filter = set_search_category($filter);
+
+        $data = get_package($filter, $data, $app);
+
+        $data->meta['search'] = $filter['filter'];
+        $data->meta['per-page'] = '<=50';
+        $data->meta['count'] = count($data->data);
+        if($data) json_api_encode($data, $app); return;
+    }
+
+    $app->handle('/404');
 });
 
 // Retrieves packages by flagged-id
@@ -577,7 +614,7 @@ $app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
 });
 
 
-$app->get('/flagged/{filter:.*}', function($filter) use ($app) {
+$app->get('/flagged/{filters:.*}', function($filters) use ($app) {
     $data = initJapiData($app, 'flagged');
     $cols = 'fid, created, reporter, new_version, message';
     $condt = '';
@@ -593,7 +630,7 @@ $app->get('/flagged/{filter:.*}', function($filter) use ($app) {
     }
 
     if('fids' === $app->myapi->flags) {
-        list($n, $l) = explode('/', $filter);
+        list($n, $l) = explode('/', $filters);
         $condt = "fid IN ($l)";
         $cols = 'fid, created';
     }
@@ -702,16 +739,65 @@ $app->get('/contents/{id:[0-9]+}/relationships/{type}', function($id, $type) use
     $app->handle('/404');
 });
 
+$app->get(
+    '/provides/{name:[a-zA-Z0-9\-\_\:\.]+}/relationships/{type}{filters:.*}',
+    function($name, $type, $filters) use ($app)
+{
+    $data = initJapiData($app, 'provides');
+    $name = mb_substr($name, 0, 120);
 
-// Retrieves package data by its depends(name) relationships (funny relationships)
-//  possibly taken as packages that depends on this given named pkg # TODO
-$app->get('/depends/{name:[a-z]+.*}/relationships/{type}', function($name, $type) use ($app) {
+    $res = Provides::find( array( "name = '$name'") );
+    $tnum = count($res);
+    if( ! $tnum > 0) { $app->handle('/404'); return; }
+
+    if($type === 'none') {
+        $data->meta = array(
+            'count' => $tnum
+        );
+        $data->data = fmtData($res, 'provides.', $app)->data;
+        $data = populate_maintainer($data, $app);
+        json_api_encode($data, $app); return;
+    }
+
+    if($type === 'packages') {
+        foreach($res as $d) { $a[] = $d->pid; }
+        $l = array2csv($a);
+        $condt = "id IN ($l)";
+        $params = array( "conditions" => "$condt" );
+        $res = Packages::find( $params );
+        $tnum = count($res);
+        $data->meta = array(
+            'count' => $tnum
+        );
+        $data->data = fmtData($res, 'packages.', $app)->data;
+        $data = populate_maintainer($data, $app);
+        json_api_encode($data, $app); return;
+    }
+
+    $app->handle('/404');
+});
+
+$app->get('/provides/{name:[a-zA-Z0-9\-\_\:\.]+}', function($name) use ($app) {
+    $app->handle("/provides/$name/relationships/none");
+});
+
+// Retrieves data by its depends(name) relationships
+// name starting with '!' means does not depends->on and thus ignored
+$app->get(
+    '/depends/{name:[a-zA-Z0-9\-\_\:\.]+}/relationships/{type}{filters:.*}',
+    function($name, $type, $filters) use ($app)
+{
     $data = initJapiData($app, 'depends');
+    $name = mb_substr($name, 0, 120);
+
+    if($type === 'provides') {
+        $app->handle("/provides/$name"); return;
+    }
 
     if($type === 'packages') {
         $res = Depends::find( array( "name = '$name'") );
         if( ! count($res) > 0) { $app->handle('/404'); return; }
-        $pid = $res[0]->pid;
+        //$pid = $res[0]->pid;
 
         # ---------------------
         foreach($res as $d) { $a[] = $d->pid; }
@@ -985,8 +1071,6 @@ function setPageLinks($uriPart, $tnum, $data, $app) {
 
     if( isset($app->myapi->offset) ) {
       $slink = preg_replace('#\/'.$uriPart.'.*$#', '', $_reqUrl);
-      //$next = $app->myapi->pgNext;
-      //$app->myapi->_reqUrl = $slink;
     } else {
       $slink = $_reqUrl;
     }
@@ -1061,6 +1145,7 @@ function fmtData($res, $type, $app) {
 
     if($type === 'depends') {
         $idf = 'pid'; $self = 'name';
+        $rels = array( "packages", "provides" );
     }
 
     if($type === 'contents') { # from table 'files'
@@ -1099,7 +1184,7 @@ function fmtData($res, $type, $app) {
         $obj->links->self = $slink.$item->$self;
 
         if($type === 'depends') {
-            $obj->links->self = '/packages/'.$item->name;
+            //$obj->links->self = '/packages/'.$item->name;
         }
 
         $rlink = $slink.$item->$self;
