@@ -212,6 +212,7 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
 
     if('packages' === $where) {
       $filter = set_search_name_pkg($filter);
+      $filter = set_search_name_pkg($filter, 'origin');
       $filter = set_search_version_pkg($filter);
       $filter = set_search_orderby_pkg($filter);
       $data = get_package($filter, $data, $app);
@@ -251,6 +252,7 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where) use ($app) {
 
     if('packages' === $where) {
       $filter = set_search_name_pkg($filter);
+      $filter = set_search_name_pkg($filter, 'origin');
       $filter = set_search_version_pkg($filter);
       $filter = set_search_orderby_pkg($filter);
       $data = get_package($filter, $data, $app);
@@ -291,8 +293,8 @@ function set_search_row($f=array(), $app) {
 
 function get2filter($f=array()) {
     $_k = array('category', 'branch', 'repo', 'arch',
-                'name', 'maintainer', 'flagged', 'sort',
-                'page', 'row');
+                'name', 'origin', 'maintainer', 'flagged',
+                'sort', 'page', 'row');
     foreach($_k as $v) {
         if(array_key_exists($v, $_GET) && trim($_GET[$v]) !== '') {
             $f[$v] = mb_substr($_GET[$v], 0, 56);
@@ -332,8 +334,8 @@ function set_search_glob($f, $n, $v, $isCond=1) {
     $f['filter'][$n] = $l1.$v.$l2;
     return $f;
 }
-function set_search_name_pkg($f) {
-    $n = 'name'; if( ! array_key_exists($n, $f) ) return $f;
+function set_search_name_pkg($f, $s='name') {
+    $n = $s; if( ! array_key_exists($n, $f) ) return $f;
     $nv = preg_replace('#[^a-z0-9\-\_\.]#', '', $f[$n]);
     return set_search_glob($f, $n, $nv);
 }
@@ -978,8 +980,8 @@ function setPageLinks($uriPart, $tnum, $data, $app) {
         'total-count' => $tnum
     );
 
-    $_reqUrl = cleanUri($app->request->get('_url'));
-    //$app->myapi->_reqUrl = $_reqUrl;
+    //$_reqUrl = cleanUri($app->request->get('_url'));
+    $_reqUrl = $app->myapi->_reqUrl;
 
     if( isset($app->myapi->offset) ) {
       $slink = preg_replace('#\/'.$uriPart.'.*$#', '', $_reqUrl);
