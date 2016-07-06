@@ -1183,10 +1183,6 @@ function fmtData($res, $type, $app) {
 
         $obj->links->self = $slink.$item->$self;
 
-        if($type === 'depends') {
-            //$obj->links->self = '/packages/'.$item->name;
-        }
-
         $rlink = $slink.$item->$self;
 
         // some cleaning
@@ -1201,6 +1197,9 @@ function fmtData($res, $type, $app) {
             # make relationships objects links
             foreach($rels as $val) {
                 $_rels[$val]['links']['self'] = $rlink.$val;
+                if($val === 'depends') {
+                    $_rels[$val]['links']['related'] = $app->config['apiurl'].'/packages/'.$obj->id.'/depends';
+                }
             }
             $obj->relationships = (object)$_rels;
         }
