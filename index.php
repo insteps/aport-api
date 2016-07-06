@@ -1198,7 +1198,7 @@ function fmtData($res, $type, $app) {
             foreach($rels as $val) {
                 $_rels[$val]['links']['self'] = $rlink.$val;
                 if($val === 'depends') {
-                    $_rels[$val]['links']['related'] = $app->config['apiurl'].'/packages/'.$obj->id.'/depends';
+                    $_rels[$val]['links']['related'] = $app->config['apiurl'].'/packages/id/'.$obj->id.'/depends';
                 }
             }
             $obj->relationships = (object)$_rels;
