@@ -418,6 +418,7 @@ function get_package($filter=array(), $data=array(), $app) {
            );
     $res = Packages::find( $params );
     $tnum = count($res);
+    if($tnum < 1) { $app->handle('/404'); exit; }
     $tnum = (isset($filter['offset']) && $filter['offset']<=$tnum)
              ? $tnum-$filter['offset'] : $tnum;
 
@@ -456,13 +457,25 @@ $app->get(
     '/packages/name/{name:[a-z0-9\-\_\.]+}/{type}{filters:.*}',
     function($name, $type, $filters) use ($app)
 {
-    if('depends' !== $type) { $app->handle('/404'); return; }
-    $data = initJapiData($app, 'packages');
+    if('depends' == $type) {
+        $data = initJapiData($app, 'packages');
 
-    $res = Packages::findFirst( array( "name = '$name'", 'limit' => 1) );
-    if( ! $res->id) { $app->handle('/404'); return; }
-    $id = $res->id;
-    $app->handle("/packages/id/$id/{$type}{$filters}"); return;
+        $name = mb_substr($name, 0, 120);
+        $res = Packages::findFirst( array( "name = '$name'", 'limit' => 1) );
+        if( ! $res->id) { $app->handle('/404'); return; }
+        $id = $res->id;
+        $app->handle("/packages/id/$id/{$type}{$filters}"); return;
+    }
+    if('provides' == $type) {
+        $data = initJapiData($app, 'packages');
+
+        $name = mb_substr($name, 0, 120);
+        $res = Packages::findFirst( array( "name = '$name'", 'limit' => 1) );
+        if( ! $res->id) { $app->handle('/404'); return; }
+        $id = $res->id;
+        $app->handle("/packages/id/$id/{$type}{$filters}"); return;
+    }
+    $app->handle('/404');
 });
 
 // Retrieves packages by id
@@ -521,7 +534,33 @@ $app->get(
         $l = array2csv($a);
         $condt = "id IN ($l)";
         //apply filters
+        $filter['filter2'] =  array();
+        $filter['filter2'][] = "id IN ($l)";
+        $filter = set_search_category($filter);
 
+        $data = get_package($filter, $data, $app);
+
+        $data->meta['search'] = $filter['filter'];
+        $data->meta['per-page'] = '<=50';
+        $data->meta['count'] = count($data->data);
+        if($data) json_api_encode($data, $app); return;
+    }
+
+    if('provides' === $type) {
+        $res = Provides::find( array( "pid = '$pid'" ) );
+        if(count($res) < 1) { $app->handle('/404'); return; }
+
+        foreach($res as $d) { $a[] = "\"$d->name\""; }
+        $l = array2csv($a);
+        $condt = "name IN ($l)";
+        $params = array( "conditions" => "$condt", 'DISTINCT' => "name" );
+        $res = Depends::find( $params );
+        if(count($res) < 1) { $app->handle('/404'); return; }
+
+        foreach($res as $d) { $a[] = $d->pid; }
+        $l = array2csv($a);
+        $condt = "id IN ($l)";
+        //apply filters
         $filter['filter2'] =  array();
         $filter['filter2'][] = "id IN ($l)";
         $filter = set_search_category($filter);
@@ -681,12 +720,6 @@ $app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function($fid, $type) us
     $app->handle('/404');
 });
 
-// Seems depends would only have a relationship with packages
-// this route can be directed to below route
-$app->get('/depends/{name:[a-z]+.*}', function($name) use ($app) {
-    $app->handle("/depends/$name/relationships/packages");
-});
-
 
 $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}',
     function($rel, $pid) use ($app) {
@@ -721,6 +754,7 @@ $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}'
     json_api_encode($data, $app); return;
 });
 
+
 // Retrieves contents(files) by id
 $app->get('/contents/id/{id:[0-9]+}', function($id) use ($app) {
     $data = initJapiData($app, 'contents');
@@ -740,12 +774,15 @@ $app->get('/contents/{id:[0-9]+}/relationships/{type}', function($id, $type) use
     $app->handle('/404');
 });
 
+
 $app->get(
     '/provides/{name:[a-zA-Z0-9\-\_\:\.]+}/relationships/{type}{filters:.*}',
     function($name, $type, $filters) use ($app)
 {
     $data = initJapiData($app, 'provides');
     $name = mb_substr($name, 0, 120);
+
+    $filter = (array)sanitize_filters($filters, '', $app);
 
     $res = Provides::find( array( "name = '$name'") );
     $tnum = count($res);
@@ -756,23 +793,29 @@ $app->get(
             'count' => $tnum
         );
         $data->data = fmtData($res, 'provides.', $app)->data;
-        $data = populate_maintainer($data, $app);
         json_api_encode($data, $app); return;
     }
 
+    if($type === 'depends') {
+        $app->handle("/depends/$name"); return;
+    }
+
     if($type === 'packages') {
+        # ---------------------
         foreach($res as $d) { $a[] = $d->pid; }
         $l = array2csv($a);
-        $condt = "id IN ($l)";
-        $params = array( "conditions" => "$condt" );
-        $res = Packages::find( $params );
-        $tnum = count($res);
-        $data->meta = array(
-            'count' => $tnum
-        );
-        $data->data = fmtData($res, 'packages.', $app)->data;
-        $data = populate_maintainer($data, $app);
-        json_api_encode($data, $app); return;
+
+        $filter['filter2'] =  array();
+        $filter['filter2'][] = "id IN ($l)";
+        $filter = set_search_category($filter);
+
+        $data = get_package($filter, $data, $app);
+
+        $data->meta['search'] = $filter['filter'];
+        $data->meta['per-page'] = '<=50';
+        $data->meta['count'] = count($data->data);
+        if($data) json_api_encode($data, $app); return;
+        # ---------------------
     }
 
     $app->handle('/404');
@@ -781,6 +824,7 @@ $app->get(
 $app->get('/provides/{name:[a-zA-Z0-9\-\_\:\.]+}', function($name) use ($app) {
     $app->handle("/provides/$name/relationships/none");
 });
+
 
 // Retrieves data by its depends(name) relationships
 // name starting with '!' means does not depends->on and thus ignored
@@ -791,36 +835,47 @@ $app->get(
     $data = initJapiData($app, 'depends');
     $name = mb_substr($name, 0, 120);
 
+    $filter = (array)sanitize_filters($filters, '', $app);
+
+    $res = Depends::find( array( "name = '$name'") );
+    $tnum = count($res);
+    if( ! $tnum > 0) { $app->handle('/404'); return; }
+
+    if($type === 'none') {
+        $data->meta = array(
+            'count' => $tnum
+        );
+        $data->data = fmtData($res, 'depends.', $app)->data;
+        json_api_encode($data, $app); return;
+    }
+
     if($type === 'provides') {
         $app->handle("/provides/$name"); return;
     }
 
     if($type === 'packages') {
-        $res = Depends::find( array( "name = '$name'") );
-        if( ! count($res) > 0) { $app->handle('/404'); return; }
-        //$pid = $res[0]->pid;
-
         # ---------------------
         foreach($res as $d) { $a[] = $d->pid; }
         $l = array2csv($a);
-        $condt = "id IN ($l)";
-        $params = array( "conditions" => "$condt" );
-        $res = Packages::find( $params );
-        //$res = Packages::query->where('id IN (:l:)')->bind(array("l" => "1,2"))->execute(); # ??
-        $tnum = count($res);
-        $data->meta = array(
-            'count' => $tnum
-        );
 
-        $data->data = fmtData($res, 'packages.', $app)->data;
-        $data = populate_maintainer($data, $app);
+        $filter['filter2'] =  array();
+        $filter['filter2'][] = "id IN ($l)";
+        $filter = set_search_category($filter);
 
-        json_api_encode($data, $app); return;
+        $data = get_package($filter, $data, $app);
+
+        $data->meta['search'] = $filter['filter'];
+        $data->meta['per-page'] = '<=50';
+        $data->meta['count'] = count($data->data);
+        if($data) json_api_encode($data, $app); return;
         # ---------------------
-
-        //return $app->handle("/packages/$pid"); # TODO
     }
+
     $app->handle('/404');
+});
+
+$app->get('/depends/{name:[a-zA-Z0-9\-\_\:\.]+}', function($name) use ($app) {
+    $app->handle("/depends/$name/relationships/none");
 });
 
 
@@ -1141,6 +1196,7 @@ function fmtData($res, $type, $app) {
 
     if($type === 'provides') {
         $idf = 'pid'; $self = 'name';
+        $rels = array( "packages", "depends" );
         //$slink = '/' . 'files' . '/'; # TODO
     }
 
@@ -1198,8 +1254,8 @@ function fmtData($res, $type, $app) {
             # make relationships objects links
             foreach($rels as $val) {
                 $_rels[$val]['links']['self'] = $rlink.$val;
-                if($val === 'depends') {
-                    $_rels[$val]['links']['related'] = $app->config['apiurl'].'/packages/id/'.$obj->id.'/depends';
+                if( ($val === 'depends' || $val === 'provides') && ($type === 'packages')) {
+                    $_rels[$val]['links']['related'] = $app->config['apiurl'].'/packages/id/'.$obj->id.'/'.$val;
                 }
             }
             $obj->relationships = (object)$_rels;
