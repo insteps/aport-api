@@ -196,16 +196,34 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
 
     # Create customs filters # TODO
     $filter = set_search_category($filter);
-    $filter = set_search_flagged($filter);
     $filter = set_search_maint($filter);
     $filter = set_search_row($filter, $app);
 
     if('packages' === $where) {
-      $filter = set_search_name_pkg($filter);
-      $filter = set_search_name_pkg($filter, 'origin');
-      $filter = set_search_version_pkg($filter);
+      $filter = set_search_flagged($filter);
+      $filter = set_search_globname($filter);
+      $filter = set_search_globname($filter, 'origin');
+      $filter = set_search_globname($filter, 'version', 1);
       $filter = set_search_orderby_pkg($filter);
       $data = get_package($filter, $data, $app);
+    }
+
+    if('contents' === $where) {
+        $filter = set_search_globname($filter);
+        $filter_ = $filter; //copy
+        if( ! isset($filter['filter']['name'])) { $app->handle('/404'); return; }
+        unset($filter['page']); $app->myapi->reqPage = 0;
+        $data = get_package($filter, $data, $app);
+        $id = $data->data[0]->id;
+        foreach(['branch', 'repo', 'arch'] as $v) {
+            $f[$v] = $data->data[0]->attributes->$v;
+        }
+        $filter = $filter_;
+        unset($filter['filter2']);
+        $filter = set_search_page($filter, $app);
+        $filter['filter2'][] = "pid = '$id'";
+        $data = get_package($filter, $data, $app, 'Files');
+        $filter['filter'] = array_merge($f, $filter['filter']);
     }
 
     $data->meta['search'] = $filter['filter'];
@@ -240,9 +258,9 @@ $app->post('/search/{where:[a-z0-9\_]+}', function($where) use ($app) {
     //print_r($filter); exit;
 
     if('packages' === $where) {
-      $filter = set_search_name_pkg($filter);
-      $filter = set_search_name_pkg($filter, 'origin');
-      $filter = set_search_version_pkg($filter);
+      $filter = set_search_globname($filter);
+      $filter = set_search_globname($filter, 'origin');
+      $filter = set_search_globname($filter, 'version', 1);
       $filter = set_search_orderby_pkg($filter);
       $data = get_package($filter, $data, $app);
     }
@@ -275,9 +293,14 @@ function sanitize_filters($filters='', $where='', $app='') {
     $filter = get2filter($filter);
     //common filters
     $filter['filter'] = array();
-    if(isset($filter['page'])) $app->myapi->reqPage = (int)$filter['page'];
-    $filter['filter']['page'] = $app->myapi->reqPage;
+    $filter = set_search_page($filter, $app);
     return $filter;
+}
+
+function set_search_page($f=array(), $app) {
+    if(isset($f['page'])) $app->myapi->reqPage = (int)$f['page'];
+    $f['filter']['page'] = $app->myapi->reqPage;
+    return $f;
 }
 
 function set_search_row($f=array(), $app) {
@@ -334,15 +357,10 @@ function set_search_glob($f, $n, $v, $isCond=1) {
     $f['filter'][$n] = $l1.$v.$l2;
     return $f;
 }
-function set_search_name_pkg($f, $s='name') {
+function set_search_globname($f, $s='name', $isTr=0) {
     $n = $s; if( ! array_key_exists($n, $f) ) return $f;
     $nv = preg_replace('#[^a-z0-9\-\_\.]#', '', $f[$n]);
-    return set_search_glob($f, $n, $nv);
-}
-function set_search_version_pkg($f) {
-    $n = 'version'; if( ! array_key_exists($n, $f) ) return $f;
-    $nv = preg_replace('#[^a-z0-9\-\_\.]#', '', $f[$n]);
-    $nv = trim($nv, '_');
+    if($isTr) $nv = trim($nv, '_');
     return set_search_glob($f, $n, $nv);
 }
 function set_search_maint($f) {
@@ -408,17 +426,17 @@ $app->get('/packages{filters:.*}', function($filters) use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
-function get_package($filter=array(), $data=array(), $app) {
+function get_package($filter=array(), $data=array(), $app, $Type='Packages') {
     $condt = isset($filter['filter2']) ? implode(' AND ', $filter['filter2']) : '';
     $sort = isset($filter['filter']['sort']) ? $filter['filter']['sort'] : "id DESC";
 
-    # get Packages count
+    # get count
     $params = array(
             'conditions' => "$condt"
            );
-    $res = Packages::find( $params );
+    $res = $Type::find( $params );
     $tnum = count($res);
-    if($tnum < 1) { $app->handle('/404'); exit; }
+    if($tnum <= 0) { $app->handle('/404'); exit; }
     $tnum = (isset($filter['offset']) && $filter['offset']<=$tnum)
              ? $tnum-$filter['offset'] : $tnum;
 
@@ -431,10 +449,15 @@ function get_package($filter=array(), $data=array(), $app) {
             'limit' => $app->myapi->pglimit,
             'offset' => $_ofs
            );
-    $res = Packages::find( $params );
+    $res = $Type::find( $params );
 
-    $data->data = fmtData($res, 'packages.', $app)->data;
-    $data = populate_maintainer($data, $app);
+    if('Packages' === $Type) {
+        $data->data = fmtData($res, 'packages.', $app)->data;
+        $data = populate_maintainer($data, $app);
+    }
+    if('Files' === $Type) {
+        $data->data = fmtData($res, 'contents.', $app)->data;
+    }
     return $data;
 }
 
@@ -487,9 +510,13 @@ $app->get('/packages/{pid:[0-9]+}', function($pid) use ($app) {
 });
 
 // Retrieves packages by relationships
-$app->get('/packages/{id:[0-9]+}/relationships/{type}', function($id, $type) use ($app) {
+$app->get(
+    '/packages/{id:[0-9]+}/relationships/{type}{filters:.*}',
+    function($id, $type, $filters) use ($app)
+{
 
     $subtype = 'pid';
+    $filter = (array)sanitize_filters($filters, $where, $app);
 
     if($type === 'flagged') {
         $res = Packages::findFirst( array( "id = '$id'", 'limit' => 1 ) );
@@ -733,19 +760,29 @@ $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}'
     list($type, $subtype) = explode('.', $_r[2]);
 
     $data = initJapiData($app, $_r[0]);
-    # meta
-    $tnum = $_r[1]::count();
 
-    # data
-    $res = $_r[1]::find( array( "$subtype = '$pid'") );
-    $tnum2 = count($res);
+    # meta
+    //$tnum = $_r[1]::count(); //full count not needed
+    $res = $_r[1]::count( array( "$subtype = '$pid'") );
+    $tnum2 = $res;;
     if( ! $tnum2 > 0) { $app->handle('/404'); return; }
 
-    //setPageLinks('page', $tnum2, $data, $app);
-    $data->meta['total-count'] = $tnum;
-    $data->meta['count'] = $tnum2;
+    setPageLinks('page', $tnum2, $data, $app);
 
-    if($rel == 'contents') {
+    $sort = ($rel === 'contents') ? 'id' : $subtype;
+    $condt = "$subtype = '$pid'";
+    $params = array(
+            'conditions' => "$condt",
+            "limit" => $app->myapi->pglimit,
+            "offset" => $app->myapi->offset,
+            "order" => "$sort DESC"
+           );
+    $res = $_r[1]::find( $params );
+
+    $data->meta['total-count'] = $tnum2;
+    $data->meta['count'] = count($res);
+
+    if($rel === 'contents') {
         $d = $res[0]->pkgname;
         $data->links->related = $app->config['apiurl'].'/packages/'.$d;
     }
@@ -1122,7 +1159,6 @@ function setPageLinks($uriPart, $tnum, $data, $app) {
         'total-count' => $tnum
     );
 
-    //$_reqUrl = cleanUri($app->request->get('_url'));
     $_reqUrl = $app->myapi->_reqUrl;
 
     if( isset($app->myapi->offset) ) {
