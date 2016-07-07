@@ -452,19 +452,17 @@ $app->get('/packages/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
     $app->handle("/packages/name/$name"); return;
 });
 
-$app->get('/packages/name/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
+$app->get(
+    '/packages/name/{name:[a-z0-9\-\_\.]+}/{type}{filters:.*}',
+    function($name, $type, $filters) use ($app)
+{
+    if('depends' !== $type) { $app->handle('/404'); return; }
     $data = initJapiData($app, 'packages');
 
-    $res = Packages::find( array( "name = '$name'", "order" => "id DESC") );
-    $tnum = count($res);
-    if($tnum < 1) { $app->handle('/404'); return; }
-
-    $data->meta = array(
-        'count' => $tnum
-    );
-    $data->data = fmtData($res, 'packages.', $app)->data;
-    $data = populate_maintainer($data, $app);
-    if($data) json_api_encode($data, $app);
+    $res = Packages::findFirst( array( "name = '$name'", 'limit' => 1) );
+    if( ! $res->id) { $app->handle('/404'); return; }
+    $id = $res->id;
+    $app->handle("/packages/id/$id/{$type}{$filters}"); return;
 });
 
 // Retrieves packages by id
@@ -500,7 +498,10 @@ $app->get('/packages/pid/{pid:[0-9]+}', function($pid) use ($app) {
 });
 
 // Retrieves Dependencies for packages->id
-$app->get('/packages/id/{pid:[0-9]+}/{type}{filters:.*}', function($pid, $type, $filters) use ($app) {
+$app->get(
+    '/packages/id/{pid:[0-9]+}/{type}{filters:.*}',
+    function($pid, $type, $filters) use ($app)
+{
     $data = initJapiData($app, 'packages');
 
     $filter = (array)sanitize_filters($filters, '', $app);
