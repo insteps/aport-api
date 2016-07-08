@@ -565,7 +565,7 @@ $app->get(
         $id = $res->fid;
     }
 
-    if($id) { $app->handle("/$type/$subtype/$id"); } else {  $app->handle('/404'); }
+    if($id) { $app->handle("/$type/$subtype/$id"); } else { $app->handle('/404'); }
 
 });
 
@@ -579,70 +579,49 @@ $app->get('/packages/pid/{pid:[0-9]+}', function($pid) use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
-// Retrieves Dependencies for packages->id
+// {type} = depends | provides
+// depends:  Retrieves Dependencies for packages->id
+// provides: required-by i.e Retrieves pkgs that depends on this packages->id
+// data is fetched without making sql JOINs
 $app->get(
     '/packages/id/{pid:[0-9]+}/{type}{filters:.*}',
     function($pid, $type, $filters) use ($app)
 {
+    $_w = array('depends', 'provides');
+    if ( ! in_array($type, $_w)) return false;
+
     $data = initJapiData($app, 'packages');
+
+    $_w['depends'] = array('Depends', 'Provides');
+    $_w['provides'] = array('Provides', 'Depends');
 
     $filter = (array)sanitize_filters($filters, '', $app);
 
-    if('depends' === $type) {
-        $res = Depends::find( array( "pid = '$pid'" ) );
-        if(count($res) < 1) { $app->handle('/404'); return; }
+    $res = $_w[$type][0]::find( array( "pid = '$pid'" ) );
+    if(count($res) < 1) { $app->handle('/404'); return; }
 
-        foreach($res as $d) { $a[] = "\"$d->name\""; }
-        $l = array2csv($a);
-        $condt = "name IN ($l)";
-        $params = array( "conditions" => "$condt", 'DISTINCT' => "name" );
-        $res = Provides::find( $params );
-        if(count($res) < 1) { $app->handle('/404'); return; }
+    foreach($res as $d) { $a[] = "\"$d->name\""; }
+    $l = array2csv($a);
+    $condt = "name IN ($l)";
+    $params = array( "conditions" => "$condt", 'DISTINCT' => "name" );
+    $res = $_w[$type][1]::find( $params );
+    if(count($res) < 1) { $app->handle('/404'); return; }
 
-        foreach($res as $d) { $a[] = $d->pid; }
-        $l = array2csv($a);
-        $condt = "id IN ($l)";
-        //apply filters
-        $filter['filter2'] =  array();
-        $filter['filter2'][] = "id IN ($l)";
-        $filter = set_search_category($filter);
+    foreach($res as $d) { $a[] = $d->pid; }
+    $l = array2csv($a);
+    $condt = "id IN ($l)";
+    //apply filters
+    //$filter['filter2'] =  array();
+    $filter['filter2'][] = "id IN ($l)";
+    $filter = set_search_category($filter);
 
-        $data = get_package($filter, $data, $app);
+    $data = get_package($filter, $data, $app);
 
-        $data->meta['search'] = $filter['filter'];
-        $data->meta['per-page'] = '<=50';
-        $data->meta['count'] = count($data->data);
-        if($data) json_api_encode($data, $app); return;
-    }
+    $data->meta['search'] = $filter['filter'];
+    $data->meta['per-page'] = '<=50';
+    $data->meta['count'] = count($data->data);
+    if($data) json_api_encode($data, $app);
 
-    if('provides' === $type) {
-        $res = Provides::find( array( "pid = '$pid'" ) );
-        if(count($res) < 1) { $app->handle('/404'); return; }
-
-        foreach($res as $d) { $a[] = "\"$d->name\""; }
-        $l = array2csv($a);
-        $condt = "name IN ($l)";
-        $params = array( "conditions" => "$condt", 'DISTINCT' => "name" );
-        $res = Depends::find( $params );
-        if(count($res) < 1) { $app->handle('/404'); return; }
-
-        foreach($res as $d) { $a[] = $d->pid; }
-        $l = array2csv($a);
-        $condt = "id IN ($l)";
-        //apply filters
-        $filter['filter2'] =  array();
-        $filter['filter2'][] = "id IN ($l)";
-        $filter = set_search_category($filter);
-
-        $data = get_package($filter, $data, $app);
-
-        $data->meta['search'] = $filter['filter'];
-        $data->meta['per-page'] = '<=50';
-        $data->meta['count'] = count($data->data);
-        if($data) json_api_encode($data, $app); return;
-    }
-
-    $app->handle('/404');
 });
 
 // Retrieves packages by flagged-id
