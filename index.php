@@ -195,11 +195,11 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
     $filter = (array)sanitize_filters($filters, $where, $app);
 
     # Create customs filters # TODO
-    $filter = set_search_category($filter);
     $filter = set_search_maint($filter);
     $filter = set_search_row($filter, $app);
 
     if('packages' === $where) {
+      $filter = set_search_category($filter);
       $filter = set_search_flagged($filter);
       $filter = set_search_globname($filter);
       $filter = set_search_globname($filter, 'origin');
@@ -209,21 +209,22 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
     }
 
     if('contents' === $where) {
-        $filter = set_search_globname($filter);
-        $filter_ = $filter; //copy
-        if( ! isset($filter['filter']['name'])) { $app->handle('/404'); return; }
-        unset($filter['page']); $app->myapi->reqPage = 0;
-        $data = get_package($filter, $data, $app);
-        $id = $data->data[0]->id;
-        foreach(['branch', 'repo', 'arch'] as $v) {
-            $f[$v] = $data->data[0]->attributes->$v;
+        $filter2 = set_search_page($filter, $app);
+        $filter1 = set_search_category($filter);
+        if( isset($filter['name'])) $filter2['pkgname'] = $filter['name'];
+        $filter2 = set_search_globname($filter2, 'pkgname');
+        $filter2 = set_search_globname($filter2, 'file');
+
+        foreach($filter2['filter2'] as $k=>$v) { 
+            $filter2['filter2'][$k] = 'Files.'.$v;
         }
-        $filter = $filter_;
-        unset($filter['filter2']);
-        $filter = set_search_page($filter, $app);
-        $filter['filter2'][] = "pid = '$id'";
-        $data = get_package($filter, $data, $app, 'Files');
-        $filter['filter'] = array_merge($f, $filter['filter']);
+        foreach($filter1['filter2'] as $k=>$v) { 
+            $filter1['filter2'][$k] = 'Packages.'.$v;
+        }
+        $filter['filter2'] = array_merge($filter2['filter2'], $filter1['filter2']);
+
+        $data = get_content($filter, $data, $app, 'Files');
+        $filter['filter'] = array_merge($filter2['filter'], $filter1['filter']);
     }
 
     $data->meta['search'] = $filter['filter'];
@@ -317,7 +318,7 @@ function set_search_row($f=array(), $app) {
 function get2filter($f=array()) {
     $_k = array('category', 'branch', 'repo', 'arch',
                 'name', 'origin', 'maintainer', 'flagged',
-                'sort', 'page', 'row');
+                'sort', 'page', 'row', 'file');
     foreach($_k as $v) {
         if(array_key_exists($v, $_GET) && trim($_GET[$v]) !== '') {
             $f[$v] = mb_substr($_GET[$v], 0, 56);
@@ -426,6 +427,46 @@ $app->get('/packages{filters:.*}', function($filters) use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
+function get_content($filter=array(), $data=array(), $app, $Type='Content') {
+
+    if('Files' === $Type) {
+        $condt = isset($filter['filter2']) ? implode(' AND ', $filter['filter2']) : '';
+        $where = $condt ? "WHERE ".$condt." " : '';
+
+        $phql = "SELECT count(Files.id) as count "
+              . "FROM Files "
+              . "LEFT JOIN Packages ON Files.pid = Packages.id "
+              . $where ;
+        $res2 = $app->modelsManager->executeQuery($phql);
+
+        $tnum = (int)$res2[0]['count'];
+        if($tnum <= 0) { $app->handle('/404'); exit; }
+        $tnum = (isset($filter['offset']) && $filter['offset']<=$tnum)
+                 ? $tnum-$filter['offset'] : $tnum;
+        setPageLinks('page', $tnum, $data, $app);
+        $_ofs = isset($filter['offset']) ? $filter['offset'] : $app->myapi->offset;
+
+        $phql = "SELECT
+                   Files.id, Files.file, Files.path, Files.pkgname, Files.pid,
+                   Packages.branch, Packages.repo, Packages.arch, Packages.name "
+              . "FROM Files "
+              . "LEFT JOIN Packages ON Files.pid = Packages.id "
+              . $where
+              . "ORDER BY Files.id DESC LIMIT 50 OFFSET $_ofs";
+        $res2 = $app->modelsManager->executeQuery($phql);
+
+        foreach($res2 as $r) {
+            $rr = new stdClass;
+            $fl = ['id', 'file', 'path', 'pkgname', 'pid', 'branch', 'repo', 'arch', 'name'];
+            foreach($fl as $f) $rr->$f = $r[$f];
+            $new[] = $rr;
+        }
+        $data->data = fmtData($new, 'contents.', $app)->data;
+    }
+
+    return $data;
+}
+
 function get_package($filter=array(), $data=array(), $app, $Type='Packages') {
     $condt = isset($filter['filter2']) ? implode(' AND ', $filter['filter2']) : '';
     $sort = isset($filter['filter']['sort']) ? $filter['filter']['sort'] : "id DESC";
@@ -443,21 +484,20 @@ function get_package($filter=array(), $data=array(), $app, $Type='Packages') {
     setPageLinks('page', $tnum, $data, $app);
 
     $_ofs = isset($filter['offset']) ? $filter['offset'] : $app->myapi->offset;
+
     $params = array(
             'conditions' => "$condt",
             'order' => "$sort",
             'limit' => $app->myapi->pglimit,
             'offset' => $_ofs
            );
-    $res = $Type::find( $params );
 
     if('Packages' === $Type) {
+        $res = $Type::find( $params );
         $data->data = fmtData($res, 'packages.', $app)->data;
         $data = populate_maintainer($data, $app);
     }
-    if('Files' === $Type) {
-        $data->data = fmtData($res, 'contents.', $app)->data;
-    }
+
     return $data;
 }
 
@@ -1265,7 +1305,11 @@ function fmtData($res, $type, $app) {
         $obj->id = $item->$idf;
         $obj->links = new stdClass;
 
-        $obj->attributes = (object)$item;
+        if( is_object($item) && method_exists($item,'toArray') ) {
+            $obj->attributes = (object)$item->toArray();
+        } else {
+            $obj->attributes = (object)$item;
+        }
 
         # see http://jsonapi.org/format/#document-top-level if still an issue
         //$jsonApi->data = $obj; # primary data in a single resource identifier object
