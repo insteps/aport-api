@@ -189,8 +189,7 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
     $data = initJapiData($app, 'search');
 
     $_w = array('packages', 'contents');
-    //$_k = array('category', 'name', 'maintainer', 'flagged'); # TODO
-    if ( ! in_array($where, $_w)) return;
+    if ( ! in_array($where, $_w)) return false;
 
     $filter = (array)sanitize_filters($filters, $where, $app);
 
@@ -221,7 +220,6 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
         foreach($filter1['filter2'] as $k=>$v) {
             $filter['filter2'][] = $filter1['filter2'][$k] = 'Packages.'.$v;
         }
-
         $data = get_content($filter, $data, $app, 'Files');
         $filter['filter'] = array_merge($filter2['filter'], $filter1['filter']);
     }
@@ -416,17 +414,6 @@ $app->get('/categories', function() use ($app) {
     if($data) json_api_encode($data, $app);
 });
 
-// Retrieves packages
-$app->get('/packages{filters:.*}', function($filters) use ($app) {
-    if($filters !== '' || count($_GET) >= 2) {
-        $app->handle("/search/packages/$filters"); return;
-    }
-    $data = initJapiData($app, 'packages');
-    
-    $data = get_package(array(), $data, $app);
-    if($data) json_api_encode($data, $app);
-});
-
 function get_content($filter=array(), $data=array(), $app, $Type='Content') {
 
     if('Files' === $Type) {
@@ -437,13 +424,15 @@ function get_content($filter=array(), $data=array(), $app, $Type='Content') {
               . "FROM Files "
               . "LEFT JOIN Packages ON Files.pid = Packages.id "
               . $where ;
-        $res2 = $app->modelsManager->executeQuery($phql);
 
+        $res2 = $app->modelsManager->executeQuery($phql);
         $tnum = (int)$res2[0]['count'];
         if($tnum <= 0) { $app->handle('/404'); exit; }
         $tnum = (isset($filter['offset']) && $filter['offset']<=$tnum)
                  ? $tnum-$filter['offset'] : $tnum;
+
         setPageLinks('page', $tnum, $data, $app);
+
         $_ofs = isset($filter['offset']) ? $filter['offset'] : $app->myapi->offset;
 
         $phql = "SELECT
@@ -453,8 +442,8 @@ function get_content($filter=array(), $data=array(), $app, $Type='Content') {
               . "LEFT JOIN Packages ON Files.pid = Packages.id "
               . $where
               . "ORDER BY Files.id DESC LIMIT 50 OFFSET $_ofs";
-        $res2 = $app->modelsManager->executeQuery($phql);
 
+        $res2 = $app->modelsManager->executeQuery($phql);
         foreach($res2 as $r) {
             $rr = new stdClass;
             $fl = ['id', 'file', 'path', 'pkgname', 'pid', 'branch', 'repo', 'arch', 'name'];
@@ -501,6 +490,22 @@ function get_package($filter=array(), $data=array(), $app, $Type='Packages') {
     return $data;
 }
 
+
+// Retrieves packages
+$app->get('/packages/{filters:.*}', function($filters) use ($app) {
+    if($filters !== '' || count($_GET) >= 2) {
+        $app->handle("/search/packages/$filters"); return;
+    }
+    return false;
+});
+
+// Retrieves packages
+$app->get('/packages', function() use ($app) {
+    $data = initJapiData($app, 'packages');
+    $data = get_package(array(), $data, $app);
+    if($data) json_api_encode($data, $app);
+});
+
 // Retrieves packages by paginations
 $app->get('/packages/page/{page:[0-9]+}', function($page) use ($app) {
     $app->myapi->reqPage = (int)$page;
@@ -516,29 +521,24 @@ $app->get('/packages/{name:[a-z0-9\-\_\.]+}', function($name) use ($app) {
     $app->handle("/packages/name/$name"); return;
 });
 
+// {type} = depends | provides
+// depends:  list pkgs dependencies for name/<named> pkg
+// provides: required-by i.e list pkgs that depends on this name/<named> pkg
 $app->get(
     '/packages/name/{name:[a-z0-9\-\_\.]+}/{type}{filters:.*}',
     function($name, $type, $filters) use ($app)
 {
-    if('depends' == $type) {
-        $data = initJapiData($app, 'packages');
+    $_w = array('depends', 'provides');
+    if ( ! in_array($type, $_w)) return false;
 
-        $name = mb_substr($name, 0, 120);
-        $res = Packages::findFirst( array( "name = '$name'", 'limit' => 1) );
-        if( ! $res->id) { $app->handle('/404'); return; }
-        $id = $res->id;
-        $app->handle("/packages/id/$id/{$type}{$filters}"); return;
-    }
-    if('provides' == $type) {
-        $data = initJapiData($app, 'packages');
+    //$data = initJapiData($app, 'packages');
 
-        $name = mb_substr($name, 0, 120);
-        $res = Packages::findFirst( array( "name = '$name'", 'limit' => 1) );
-        if( ! $res->id) { $app->handle('/404'); return; }
-        $id = $res->id;
-        $app->handle("/packages/id/$id/{$type}{$filters}"); return;
-    }
-    $app->handle('/404');
+    $name = mb_substr($name, 0, 120); # limit name to 120 chars
+    $res = Packages::findFirst( array( "name = '$name'", 'limit' => 1) );
+    if( ! $res->id) { $app->handle('/404'); return; }
+    $id = $res->id;
+
+    $app->handle("/packages/id/$id/{$type}{$filters}");
 });
 
 // Retrieves packages by id
@@ -550,6 +550,8 @@ $app->get('/packages/{pid:[0-9]+}', function($pid) use ($app) {
 });
 
 // Retrieves packages by relationships
+// this is usual one->many relationship between 2 tables only
+// primary->subtable eg. packages->files
 $app->get(
     '/packages/{id:[0-9]+}/relationships/{type}{filters:.*}',
     function($id, $type, $filters) use ($app)
@@ -567,7 +569,7 @@ $app->get(
 
 });
 
-// Retrieves packages by id
+// Retrieves packages by pid (id i.e pkgID)
 $app->get('/packages/pid/{pid:[0-9]+}', function($pid) use ($app) {
     $data = initJapiData($app, 'packages');
 
