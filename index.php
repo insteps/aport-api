@@ -215,13 +215,12 @@ $app->get('/search/{where:[a-z0-9\_]+}{filters:.*}', function($where, $filters) 
         $filter2 = set_search_globname($filter2, 'pkgname');
         $filter2 = set_search_globname($filter2, 'file');
 
-        foreach($filter2['filter2'] as $k=>$v) { 
-            $filter2['filter2'][$k] = 'Files.'.$v;
+        foreach($filter2['filter2'] as $k=>$v) {
+            $filter['filter2'][] = $filter2['filter2'][$k] = 'Files.'.$v;
         }
-        foreach($filter1['filter2'] as $k=>$v) { 
-            $filter1['filter2'][$k] = 'Packages.'.$v;
+        foreach($filter1['filter2'] as $k=>$v) {
+            $filter['filter2'][] = $filter1['filter2'][$k] = 'Packages.'.$v;
         }
-        $filter['filter2'] = array_merge($filter2['filter2'], $filter1['filter2']);
 
         $data = get_content($filter, $data, $app, 'Files');
         $filter['filter'] = array_merge($filter2['filter'], $filter1['filter']);
@@ -294,6 +293,7 @@ function sanitize_filters($filters='', $where='', $app='') {
     $filter = get2filter($filter);
     //common filters
     $filter['filter'] = array();
+    $filter['filter2'] = array();
     $filter = set_search_page($filter, $app);
     return $filter;
 }
