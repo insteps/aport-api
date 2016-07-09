@@ -582,7 +582,7 @@ $app->get('/packages/pid/{pid:[0-9]+}', function($pid) use ($app) {
 
 // {type} = depends | provides
 // depends:  Retrieves Dependencies for packages->id
-// provides: required-by i.e Retrieves pkgs that depends on this packages->id
+// provides: required-by i.e Retrieves pkgs that depends on packages->id
 // data is fetched without making sql JOINs
 $app->get(
     '/packages/id/{pid:[0-9]+}/{type}{filters:.*}',
@@ -775,8 +775,10 @@ $app->get('/flagged/{fid:[0-9]+}/relationships/{type}', function($fid, $type) us
 });
 
 
-$app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}',
-    function($rel, $pid) use ($app) {
+$app->get(
+    '/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}',
+    function($rel, $pid) use ($app)
+{
     # array(name, className, fmtName)
     $rels['install_if'] = array("install_if", 'Installif', 'install_if.pid');
     $rels['provides'] = array("provides", 'Provides', 'provides.pid');
@@ -791,7 +793,7 @@ $app->get('/{rel:install_if|provides|depends|contents|flagged}/pid/{pid:[0-9]+}'
     # meta
     //$tnum = $_r[1]::count(); //full count not needed
     $res = $_r[1]::count( array( "$subtype = '$pid'") );
-    $tnum2 = $res;;
+    $tnum2 = $res;
     if( ! $tnum2 > 0) { $app->handle('/404'); return; }
 
     setPageLinks('page', $tnum2, $data, $app);
@@ -1270,7 +1272,7 @@ function fmtData($res, $type, $app) {
 
     if($type === 'contents') { # from table 'files'
         $idf = 'id'; $self = 'id';
-        $_unset = ['pkgname', 'pid'];
+        $_unset = array( 'pkgname', 'pid' );
     }
 
     if($type === 'packages') {
@@ -1292,7 +1294,7 @@ function fmtData($res, $type, $app) {
         $obj->id = $item->$idf;
         $obj->links = new stdClass;
 
-        if( is_object($item) && method_exists($item,'toArray') ) {
+        if( is_object($item) && method_exists($item, 'toArray') ) {
             $obj->attributes = (object)$item->toArray();
         } else {
             $obj->attributes = (object)$item;
@@ -1305,22 +1307,22 @@ function fmtData($res, $type, $app) {
         # using pid would add name in url, either add id columns to tables
         #  or deal with weird file names
 
-        $obj->links->self = $slink.$item->$self;
-
-        $rlink = $slink.$item->$self;
+        $obj->links->self = $rlink = single_slash($slink.$item->$self);
 
         // some cleaning
-        $obj->links->self = $app->config['apiurl'].single_slash($obj->links->self);
+        $obj->links->self = $app->config['apiurl'].$rlink;
         //unset($obj->links); // need more rationale # TODO
-        $rlink = $app->config['apiurl'].single_slash($rlink.'/relationships/');
+        $rlink = $app->config['apiurl'].$rlink.'/relationships/';
+
         // removes fields not needed
-        unset($item->$idf);
-        foreach($_unset as $u) unset($item->$u);
+        unset($obj->attributes->$idf);
+        foreach($_unset as $u) unset($obj->attributes->$u);
 
         if(count($rels) >= 1) {
             # make relationships objects links
             foreach($rels as $val) {
                 $_rels[$val]['links']['self'] = $rlink.$val;
+                # make 'related' links
                 if( ($val === 'depends' || $val === 'provides') && ($type === 'packages')) {
                     $_rels[$val]['links']['related'] = $app->config['apiurl'].'/packages/id/'.$obj->id.'/'.$val;
                 }
