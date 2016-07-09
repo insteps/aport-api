@@ -1144,11 +1144,9 @@ function get_all_category() {
     $cats = array();
     # get all Repoversions available
     $res = Repoversion::find();
-    foreach($res as $m1) {
-        foreach($t as $t1) { $m[$t1][] = $m1->$t1; }
+    foreach($t as $t1) {
+        $cats[$t1] = array_unique(array_column($res->toArray(), $t1));
     }
-    foreach($t as $t1) { $cats[$t1] = array_values(array_unique($m[$t1])); }
-    unset($m, $m1, $res);
     return $cats;
 }
 
