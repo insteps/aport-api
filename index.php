@@ -565,7 +565,8 @@ $app->get(
         $id = $res->fid;
     }
 
-    if($id) { $app->handle("/$type/$subtype/$id"); } else { $app->handle('/404'); }
+    if($id) { $app->handle("/$type/$subtype/$id"); return; }
+    $app->handle('/404');
 
 });
 
@@ -623,6 +624,19 @@ $app->get(
     if($data) json_api_encode($data, $app);
 
 });
+
+
+//Retrieves parent package (pkg that Packages->id is subpage of)
+$app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
+    $res = Packages::findFirst( array( "id = '$pid'", 'limit' => 1 ) );
+    if( ! $res->id) { $app->handle('/404'); return; }
+    $origin = $res->origin;
+    $filtr = ['branch', 'repo', 'arch']; $filter = array();
+    foreach($filtr as $v) $filter[] = $v.'/'.$res->$v;
+    $f = implode('/', $filter);
+    $app->handle("/search/packages/name/$origin/$f");
+});
+
 
 // Retrieves packages by flagged-id
 $app->get('/packages/fid/{fid:[0-9]+}', function($fid) use ($app) {
@@ -693,14 +707,6 @@ $app->get('/packages/flagged', function() use ($app) {
 
     if($data) json_api_encode($data, $app);
 });
-
-
-$app->get('/origins/pid/{pid:[0-9]+}', function($pid) use ($app) {
-    $res = Packages::findFirst( array( "id = '$pid'", 'limit' => 1 ) );
-    $origin = $res->origin;
-    $app->handle("/packages/name/$origin"); return;
-});
-
 
 $app->get('/flagged/{filters:.*}', function($filters) use ($app) {
     $data = initJapiData($app, 'flagged');
