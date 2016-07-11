@@ -1228,6 +1228,7 @@ function fmtData($res, $type, $app) {
     if($type === 'flagged') {
         // identifier
         $idf = 'fid'; $self = 'fid';
+        $_unset = array( 'reporter' );
     }
 
     if($type === 'install_if') {
