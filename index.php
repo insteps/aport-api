@@ -665,7 +665,7 @@ $app->get('/packages/flagged', function() use ($app) {
 
     # get Packages count
     $params = array( 'conditions' => "$condt", "group" => "origin, branch" );
-    $res = Packages::find( $params );
+    $res = Packages::count( $params );
     $tnum = count($res);
 
     setPageLinks('page', $tnum, $data, $app);
@@ -766,7 +766,7 @@ $app->get('/flagged/{fid:[0-9]+}', function($fid) use ($app) {
 
 $app->get('/flagged/fid/{fid:[0-9\,]+}', function($fid) use ($app) {
     $app->myapi->flags = 'fids';
-    $fids = array2csv(explode(',', $fid));
+    $fids = array2csv( explode(',', $fid), 1, 12, 50 );
     $app->handle("/flagged/fids/$fids");
 });
 
@@ -847,7 +847,7 @@ $app->get('/contents/{id:[0-9]+}/relationships/{type}', function($id, $type) use
 // --
 // $resource = depends
 // Retrieves data by its depends(name) relationships
-// name starting with '!' means does not depends->on and thus ignored
+// name starting with '!' means does not depends->on and thus ignored # TODO
 $app->get(
     '/{resource:provides|depends}/{name:[a-zA-Z0-9\-\_\:\.]+}/relationships/{type}{filters:.*}',
     function($resource, $name, $type, $filters) use ($app)
@@ -1172,10 +1172,13 @@ function single_slash($parturi) {
     return preg_replace('#\/{2}+#', '/', $parturi);
 }
 
-function array2csv($arr, $chars=12, $limit=50) {
-    $arr_ = array(); natsort($arr);
-    foreach($arr as $a) { $arr_[] = substr($a, 0, $chars); }
-    $arr_ = array_slice(array_reverse($arr_, true), 0, $limit);
+function array2csv($arr, $isLim=0, $chars=12, $limit=50) {
+    $arr_ = $arr;
+    if($isLim) {
+        $arr_ = array(); natsort($arr);
+        foreach($arr as $a) { $arr_[] = substr($a, 0, $chars); }
+        $arr_ = array_slice(array_reverse($arr_, true), 0, $limit);
+    }
     return preg_replace('#\,{2}+#', ',', trim(implode(',', array_unique($arr_)), ','));
 }
 
