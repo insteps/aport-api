@@ -658,10 +658,15 @@ $app->get('/packages/fid/{fid:[0-9]+}', function($fid) use ($app) {
 
 // Retrieves packages data + flagged data (included)
 // i.e a Compound Jsonapi Document
-$app->get('/packages/flagged', function() use ($app) {
+$app->get('/packages/flagged{filters:.*}', function($filters) use ($app) {
     $data = initJapiData($app, 'packages');
 
-    $condt = "fid IS NOT NULL";
+    $filter = (array)sanitize_filters($filters, '', $app);
+    $filter = set_search_globname($filter, 'origin');
+    $filter = set_search_category($filter);
+    $filter = set_search_maint($filter);
+    $filter['filter2'][] =  "fid IS NOT NULL";
+    $condt = isset($filter['filter2']) ? implode(' AND ', $filter['filter2']) : '';
 
     # get Packages count
     $params = array( 'conditions' => "$condt", "group" => "origin, branch" );
@@ -680,6 +685,10 @@ $app->get('/packages/flagged', function() use ($app) {
            );
     $res = Packages::find( $params );
 
+    if($filter) {
+        $data->meta['search'] = $filter['filter'];
+        $data->meta['per-page'] = '<=50';
+    }
     $data->meta['count'] = count($res);
     $data->data = fmtData($res, 'packages.flagged', $app)->data;
     $data = populate_maintainer($data, $app);
