@@ -614,7 +614,6 @@ $app->get(
     $l = array2csv($a);
     $condt = "id IN ($l)";
     //apply filters
-    //$filter['filter2'] =  array();
     $filter['filter2'][] = "id IN ($l)";
     $filter = set_search_category($filter);
 
@@ -767,8 +766,7 @@ $app->get('/flagged/{fid:[0-9]+}', function($fid) use ($app) {
 
 $app->get('/flagged/fid/{fid:[0-9\,]+}', function($fid) use ($app) {
     $app->myapi->flags = 'fids';
-//    $fids = explode(',', $fid);
-    $fids = array2csv(explode(',', $fid)); //clean array # TODO
+    $fids = array2csv(explode(',', $fid));
     $app->handle("/flagged/fids/$fids");
 });
 
@@ -886,7 +884,7 @@ $app->get(
         foreach($res as $d) { $a[] = $d->pid; }
         $l = array2csv($a);
 
-        $filter['filter2'] =  array();
+        //$filter['filter2'] = array();
         $filter['filter2'][] = "id IN ($l)";
         $filter = set_search_category($filter);
 
@@ -1174,8 +1172,11 @@ function single_slash($parturi) {
     return preg_replace('#\/{2}+#', '/', $parturi);
 }
 
-function array2csv($arr) {
-    return preg_replace('#\,{2}+#', ',', trim(implode(',', array_unique($arr)), ','));
+function array2csv($arr, $chars=12, $limit=50) {
+    $arr_ = array(); natsort($arr);
+    foreach($arr as $a) { $arr_[] = substr($a, 0, $chars); }
+    $arr_ = array_slice(array_reverse($arr_, true), 0, $limit);
+    return preg_replace('#\,{2}+#', ',', trim(implode(',', array_unique($arr_)), ','));
 }
 
 # Populates the package maintainer field
