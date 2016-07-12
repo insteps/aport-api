@@ -723,7 +723,8 @@ $app->get('/packages/flagged{filters:.*}', function($filters) use ($app) {
 
 $app->get('/flagged/{filters:.*}', function($filters) use ($app) {
     $data = initJapiData($app, 'flagged');
-    $cols = 'fid, created, reporter, new_version, message';
+    //$cols = 'fid, created, reporter, new_version, message';
+    $cols = null;
     $condt = '';
 
     # get Packages count
@@ -759,7 +760,7 @@ $app->get('/flagged/{filters:.*}', function($filters) use ($app) {
 });
 
 // Retrieves flagged by paginations (defaults)
-$app->get('/flagged', function($page) use ($app) {
+$app->get('/flagged', function() use ($app) {
     $app->handle("/flagged/list");
 });
 
@@ -1185,7 +1186,7 @@ function array2csv($arr, $isLim=0, $chars=12, $limit=50) {
     $arr_ = $arr;
     if($isLim) {
         $arr_ = array(); natsort($arr);
-        foreach($arr as $a) { $arr_[] = substr($a, 0, $chars); }
+        foreach($arr as $a) { $arr_[] = mb_substr($a, 0, $chars); }
         $arr_ = array_slice(array_reverse($arr_, true), 0, $limit);
     }
     return preg_replace('#\,{2}+#', ',', trim(implode(',', array_unique($arr_)), ','));
@@ -1195,9 +1196,7 @@ function array2csv($arr, $isLim=0, $chars=12, $limit=50) {
 function populate_maintainer($data, $app) { # move to model # TODO
     // add maintainer into object data
     // using array method, rather than table join as in sql query
-    foreach($data->data as $d) {
-        $a[] = $d->attributes->maintainer;
-    }
+    foreach($data->data as $d) { $a[] = $d->attributes->maintainer; }
     $l = array2csv($a);
     if(empty($l)) return $data;
     $phql = "SELECT * FROM Maintainer WHERE id IN ($l)";
